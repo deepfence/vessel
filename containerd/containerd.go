@@ -15,6 +15,11 @@ func New() *Containerd {
 	}
 }
 
+// GetSocket is socket getter
+func (c Containerd) GetSocket() string {
+	return c.socketPath
+}
+
 // ExtractImage will create the tarball from the containerd image, extracts into dir
 // and then skopeo is used to migrate oci layers using the dir to docker v1 layer spec format tar
 // and again extracts back to dir

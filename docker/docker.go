@@ -13,6 +13,11 @@ func New() *Docker {
 	}
 }
 
+// GetSocket is socket getter
+func (d Docker) GetSocket() string {
+	return d.socketPath
+}
+
 // ExtractImage creates the tarball out of image and extracts it
 func (d Docker) ExtractImage(imageID, imageName, path string) error {
 	var stderr bytes.Buffer
