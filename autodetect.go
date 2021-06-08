@@ -16,6 +16,13 @@ import (
 	"strings"
 )
 
+func init() {
+	customFormatter := new(logrus.TextFormatter)
+	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
+	logrus.SetFormatter(customFormatter)
+	customFormatter.FullTimestamp = true
+}
+
 // GetAddressAndDialer returns the address parsed from the given endpoint and a context dialer.
 func GetAddressAndDialer(endpoint string) (string, func(ctx context.Context, addr string) (net.Conn, error), error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, constants.UnixProtocol)
