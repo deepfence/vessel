@@ -3,10 +3,6 @@ package vessel
 import (
 	"context"
 	"fmt"
-	"net"
-	"net/url"
-	"os/exec"
-
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/deepfence/vessel/constants"
@@ -15,6 +11,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"net"
+	"net/url"
+	"strings"
 )
 
 // GetAddressAndDialer returns the address parsed from the given endpoint and a context dialer.
@@ -71,120 +70,99 @@ func getContainerRuntime(endPoints map[string]string) (string, string, error) {
 	if endPoints == nil || len(endPoints) == 0 {
 		return "", "", fmt.Errorf("endpoint is not set")
 	}
-	endPointsLen := len(endPoints)
-	indx := 0
-	var runtime string
+	var detectedRuntime string
 	var sockPath string
-	for r, endPoint := range endPoints {
-		logrus.Infof("trying to connect using endpoint '%s' with '%s' timeout", endPoint, constants.Timeout)
+	for endPoint, runtime := range endPoints {
+		logrus.Infof("trying to connect to endpoint '%s' with timeout '%s'", endPoint, constants.Timeout)
 		addr, dialer, err := GetAddressAndDialer(endPoint)
 		if err != nil {
-			if indx == endPointsLen-1 {
-				return "", sockPath, err
-			}
-			logrus.Error(err)
+			logrus.Warn(err)
 			continue
 		}
 
-		if r == "docker" {
-			_, err = net.Dial(constants.UnixProtocol, addr)
+		if runtime == constants.DOCKER {
+			_, err = net.DialTimeout(constants.UnixProtocol, addr, constants.Timeout)
 			if err != nil {
-				errMsg := errors.Wrapf(err, "connect endpoint '%s', make sure you are running as root and the endpoint has been started", endPoint)
-				if indx == endPointsLen-1 {
-					return "", sockPath, errMsg
-				}
+				errMsg := errors.Wrapf(err, "could not connect to endpoint '%s'", endPoint)
 				logrus.Warn(errMsg)
-			} else {
-				running, err := isDockerRunning()
-				if err != nil {
-					return "", sockPath, err
-				}
-
-				if !running {
-					errMsg := errors.Wrapf(err, "connect endpoint '%s', docker is not the runtime", endPoint)
-					if indx == endPointsLen-1 {
-						return "", sockPath, errMsg
-					}
-					logrus.Warn(errMsg)
-				} else {
-					logrus.Infof("connected successfully using endpoint: %s", endPoint)
-					runtime = r
-					sockPath = endPoint
-					break
-				}
+				continue
 			}
+			running, err := isDockerRunning(endPoint)
+			if err != nil {
+				logrus.Warn(err)
+				continue
+			}
+			if !running {
+				logrus.Warn(errors.New(fmt.Sprintf("no running containers found with endpoint %s", endPoint)))
+				continue
+			}
+			logrus.Infof("connected successfully using endpoint: %s", endPoint)
+			detectedRuntime = runtime
+			sockPath = endPoint
+			break
 		} else {
 			_, err = grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(constants.Timeout), grpc.WithContextDialer(dialer))
 			if err != nil {
-				errMsg := errors.Wrapf(err, "connect endpoint '%s', make sure you are running as root and the endpoint has been started", endPoint)
-				if indx == endPointsLen-1 {
-					return "", sockPath, errMsg
-				}
+				errMsg := errors.Wrapf(err, "could not connect to endpoint '%s'", endPoint)
 				logrus.Warn(errMsg)
-			} else {
-				running, err := isContainerdRunning()
-				if err != nil {
-					return "", sockPath, err
-				}
-
-				if !running {
-					errMsg := errors.Wrapf(err, "connect endpoint '%s', containerd is not the runtime", endPoint)
-					if indx == endPointsLen-1 {
-						return "", sockPath, errMsg
-					}
-					logrus.Warn(errMsg)
-				} else {
-					logrus.Infof("connected successfully using endpoint: %s", endPoint)
-					runtime = r
-					sockPath = endPoint
-					break
-				}
-
+				continue
 			}
+			running, err := isContainerdRunning(endPoint)
+			if err != nil {
+				logrus.Warn(err)
+				continue
+			}
+			if !running {
+				logrus.Warn(errors.New(fmt.Sprintf("no running containers found with endpoint %s", endPoint)))
+				continue
+			}
+			logrus.Infof("connected successfully using endpoint: %s", endPoint)
+			detectedRuntime = runtime
+			sockPath = endPoint
+			break
 		}
-
 	}
-	return runtime, sockPath, nil
+	return detectedRuntime, sockPath, nil
 }
 
 // AutoDetectRuntime auto detects the underlying container runtime like docker, containerd
 func AutoDetectRuntime() (string, string, error) {
-	logrus.Info("trying to auto-detect container runtime...")
 	runtime, sockPath, err := getContainerRuntime(constants.SupportedRuntimes)
 	if err != nil {
 		return "", "", err
 	}
+	if runtime == "" {
+		return "", "", errors.New("could not detect container runtime")
+	}
+	logrus.Infof("container runtime detected: %s\n", runtime)
 	return runtime, sockPath, nil
 }
 
-func isDockerRunning() (bool, error) {
-	cli, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation())
+func isDockerRunning(host string) (bool, error) {
+	dockerCli, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.WithHost(host), client.WithTimeout(constants.Timeout))
 	if err != nil {
-		panic(err)
+		return false, errors.Wrapf(err, " :error creating docker client")
 	}
-
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
+	defer dockerCli.Close()
+	containers, err := dockerCli.ContainerList(context.Background(), types.ContainerListOptions{
+		Quiet: true, All: true, Size: false,
+	})
 	if err != nil {
-		return false, errors.Wrapf(err, " :error creating docker clientset")
+		return false, errors.Wrapf(err, " :error creating docker client")
 	}
 
 	if len(containers) > 0 {
-		for _, container := range containers {
-			fmt.Printf("Container name: %s \n", container.Image)
-		}
 		return true, nil
 	}
 
 	return false, nil
 }
 
-// getHostName returns the container id
-func getHostName() ([]byte, error) {
-	return exec.Command("hostname").Output()
-}
-
-func isContainerdRunning() (bool, error) {
-	clientd, err := containerd.New("/run/containerd/containerd.sock")
+func isContainerdRunning(host string) (bool, error) {
+	clientd, err := containerd.New(strings.Replace(host, "unix://", "", 1))
+	if err != nil {
+		return false, errors.Wrapf(err, " :error creating containerd client")
+	}
 	defer clientd.Close()
 
 	// create a context for k8s with containerd namespace
@@ -194,7 +172,7 @@ func isContainerdRunning() (bool, error) {
 
 	containers, err := clientd.Containers(k8s)
 	if err != nil {
-		return false, errors.Wrapf(err, " :error creating docker clientset")
+		return false, errors.Wrapf(err, " :error creating containerd client")
 	}
 
 	if len(containers) > 0 {

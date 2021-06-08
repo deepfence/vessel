@@ -1,32 +1,28 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"os"
-
 	"github.com/deepfence/vessel"
 	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
+	"log"
+	"os"
 )
 
 var activeRuntime string
-var ContainerRuntimeInterface vessel.Runtime
-var SockPath string
-var ContainerRuntime string
+var sockPath string
+var containerRuntime string
 
 func init() {
 	var err error
 	// Auto-detect underlying container runtime
-	ContainerRuntime, SockPath, err = vessel.AutoDetectRuntime()
+	containerRuntime, sockPath, err = vessel.AutoDetectRuntime()
 	if err != nil {
-		panic(fmt.Sprint(err))
+		logrus.Error(err)
+		os.Exit(1)
 	}
-	activeRuntime = ContainerRuntime
-	fmt.Printf("%s detected\n", ContainerRuntime)
-
+	activeRuntime = containerRuntime
 	// create .env
 	os.Create(".env")
-
 }
 
 // use godot package to load/read the .env file and
@@ -39,17 +35,15 @@ func setDotEnvVariable(envars map[string]string) error {
 		log.Fatalf("Error loading .env file")
 	}
 
-	err = godotenv.Write(envars, "./.env")
-
-	return err
+	return godotenv.Write(envars, "./.env")
 }
 
 func main() {
 	if activeRuntime != "" {
-		envars := map[string]string{
-			"CONTAINER_RUNTIME": ContainerRuntime,
-			"CRI_ENDPOINT":      SockPath,
+		envVars := map[string]string{
+			"CONTAINER_RUNTIME": containerRuntime,
+			"CRI_ENDPOINT":      sockPath,
 		}
-		setDotEnvVariable(envars)
+		setDotEnvVariable(envVars)
 	}
 }
