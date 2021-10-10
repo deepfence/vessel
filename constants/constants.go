@@ -8,6 +8,7 @@ const (
 	CONTAINERD_K8S_NS = "k8s.io"
 	CONTAINERD        = "containerd"
 	DOCKER            = "docker"
+	CONTAINERD_SOCKET_ADDRESS = "/run/containerd/containerd.sock"
 )
 
 var SupportedRuntimes = map[string]string{
