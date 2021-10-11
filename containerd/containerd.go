@@ -2,10 +2,18 @@ package containerd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	containerdApi "github.com/containerd/containerd"
+	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/oci"
+	"github.com/deepfence/vessel/constants"
+	"os"
 	"os/exec"
 	"path"
+	"strings"
+	"time"
 )
 
 // New instantiates a new Containerd runtime object
@@ -140,4 +148,53 @@ func MigrateOCITarToDockerV1Tar(dir, tarName string) error {
 	}
 	return nil
 
+}
+
+// ExtractFileSystem Extract the file system from tar of an image by creating a temporary dormant container instance
+func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string) error {
+	// create a new client connected to the default socket path for containerd
+	client, err := containerdApi.New(constants.CONTAINERD_SOCKET_ADDRESS)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	// create a new context with an "temp" namespace
+	ctx := namespaces.WithNamespace(context.Background(), "temp")
+	reader, err := os.Open(imageTarPath)
+	if err != nil {
+		return err
+	}
+	imgs, err := client.Import(ctx, reader)
+	if err != nil {
+		return err
+	}
+	image, err := client.GetImage(ctx, imgs[0].Name)
+	if err != nil {
+		return err
+	}
+	snapshotName := imageName + string(time.Now().Unix())
+	container, err := client.NewContainer(
+		ctx,
+		imageName,
+		containerdApi.WithImage(image),
+		containerdApi.WithNewSnapshot(snapshotName, image),
+		containerdApi.WithNewSpec(oci.WithImageConfig(image)),
+	)
+	if err != nil {
+		return err
+	}
+	info, _ := container.Info(ctx)
+	snapshotter := client.SnapshotService(info.Snapshotter)
+	mounts, err := snapshotter.Mounts(ctx, snapshotName)
+	path := []string{""}
+	if len(mounts) > 0 {
+		options := mounts[len(mounts)-1].Options
+		path = strings.Split(options[len(options)-1], ":")
+	}
+	_, err = exec.Command("tar", "-czvf", outputTarPath, path[len(path)-1]).Output()
+	if err != nil {
+		return err
+	}
+	defer container.Delete(ctx, containerdApi.WithSnapshotCleanup)
+	return nil
 }

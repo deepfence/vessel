@@ -6,4 +6,5 @@ type Runtime interface {
 	GetImageID(imageName string) ([]byte, error)
 	Save(imageName, outputParam string) ([]byte, error)
 	GetSocket() string
+	ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string) error
 }
