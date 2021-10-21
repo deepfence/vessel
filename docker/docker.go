@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"os/exec"
+	"strings"
 )
 
 // New instantiates a new Docker runtime object
@@ -70,7 +71,7 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 	if err != nil {
 		return err
 	}
-	_, err = exec.Command("docker", "export", string(containerId), ">", outputTarPath).Output()
+	_, err = exec.Command("docker", "export", strings.TrimSpace(string(containerId)), "-o", outputTarPath).Output()
 	if err != nil {
 		return err
 	}
