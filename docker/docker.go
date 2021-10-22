@@ -63,11 +63,12 @@ func (d Docker) Save(imageName, outputParam string) ([]byte, error) {
 
 // ExtractFileSystem Extract the file system from tar of an image by creating a temporary dormant container instance
 func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string) error {
-	_, err := exec.Command("docker", "import", imageTarPath, imageName+":temp").Output()
+	imageMsg, err := exec.Command("docker", "load", "-i", imageTarPath).Output()
 	if err != nil {
 		return err
 	}
-	containerId, err := exec.Command("docker", "create", imageName+":temp", "--name", imageName+"-temp").Output()
+	imageId := strings.TrimSpace(strings.Replace(string(imageMsg),"Loaded image: ", "", 1))
+	containerId, err := exec.Command("docker", "create", imageId).Output()
 	if err != nil {
 		return err
 	}
@@ -76,6 +77,6 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 		return err
 	}
 	exec.Command("docker", "container", "rm", string(containerId))
-	exec.Command("docker", "image", "rm", imageName+":temp")
+	exec.Command("docker", "image", "rm", imageId)
 	return nil
 }
