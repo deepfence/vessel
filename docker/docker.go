@@ -3,6 +3,7 @@ package docker
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -63,12 +64,12 @@ func (d Docker) Save(imageName, outputParam string) ([]byte, error) {
 
 // ExtractFileSystem Extract the file system from tar of an image by creating a temporary dormant container instance
 func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string) error {
-	imageMsg, err := exec.Command("docker", "load", "-i", imageTarPath).Output()
+	imageMsg, err := runCommand(exec.Command("docker", "load", "-i", imageTarPath))
 	if err != nil {
 		return err
 	}
 	imageId := strings.TrimSpace(strings.Replace(string(imageMsg),"Loaded image: ", "", 1))
-	containerId, err := exec.Command("docker", "create", imageId).Output()
+	containerId, err := runCommand(exec.Command("docker", "create", imageId))
 	if err != nil {
 		return err
 	}
@@ -79,4 +80,16 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 	exec.Command("docker", "container", "rm", string(containerId))
 	exec.Command("docker", "image", "rm", imageId)
 	return nil
+}
+
+func runCommand(cmd *exec.Cmd) (output []byte, err error) {
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	errorOnRun := cmd.Run()
+	if errorOnRun != nil {
+		return nil, errors.New(fmt.Sprint(err) + ": " + stderr.String())
+	}
+	return out.Bytes(), nil
 }
