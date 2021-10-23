@@ -73,7 +73,7 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 	if err != nil {
 		return err
 	}
-	_, err = exec.Command("docker", "export", strings.TrimSpace(string(containerId)), "-o", outputTarPath).Output()
+	_, err = runCommand(exec.Command("docker", "export", strings.TrimSpace(string(containerId)), "-o", outputTarPath))
 	if err != nil {
 		return err
 	}
