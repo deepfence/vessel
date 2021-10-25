@@ -64,32 +64,33 @@ func (d Docker) Save(imageName, outputParam string) ([]byte, error) {
 
 // ExtractFileSystem Extract the file system from tar of an image by creating a temporary dormant container instance
 func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string) error {
-	imageMsg, err := runCommand(exec.Command("docker", "load", "-i", imageTarPath))
+	imageMsg, err := runCommand(exec.Command("docker", "load", "-i", imageTarPath), "docker load: " + imageTarPath)
 	if err != nil {
 		return err
 	}
 	imageId := strings.TrimSpace(strings.Replace(string(imageMsg),"Loaded image: ", "", 1))
-	containerId, err := runCommand(exec.Command("docker", "create", imageId))
+	containerId, err := runCommand(exec.Command("docker", "create", imageId), "docker create: " + imageId)
 	if err != nil {
 		return err
 	}
-	_, err = runCommand(exec.Command("docker", "export", strings.TrimSpace(string(containerId)), "-o", outputTarPath))
+	_, err = runCommand(exec.Command("docker", "export", strings.TrimSpace(string(containerId)), "-o", outputTarPath), "docker export: " + string(containerId))
 	if err != nil {
 		return err
 	}
-	exec.Command("docker", "container", "rm", string(containerId))
-	exec.Command("docker", "image", "rm", imageId)
+	exec.Command("docker", "container", "rm", string(containerId)).Run()
+	exec.Command("docker", "image", "rm", imageId).Run()
 	return nil
 }
 
-func runCommand(cmd *exec.Cmd) (output []byte, err error) {
+// operation is prepended to error message in case of error: optional
+func runCommand(cmd *exec.Cmd, operation string) (output []byte, err error) {
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	errorOnRun := cmd.Run()
 	if errorOnRun != nil {
-		return nil, errors.New(fmt.Sprint(err) + ": " + stderr.String())
+		return nil, errors.New(operation + fmt.Sprint(err) + ": " + stderr.String())
 	}
 	return out.Bytes(), nil
 }
