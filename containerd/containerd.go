@@ -9,11 +9,11 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/deepfence/vessel/constants"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
-	"time"
 )
 
 // New instantiates a new Containerd runtime object
@@ -172,29 +172,36 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	if err != nil {
 		return err
 	}
-	snapshotName := imageName + string(time.Now().Unix())
+	containerName := imageName + fmt.Sprint(rand.Intn(9999))
 	container, err := client.NewContainer(
 		ctx,
-		imageName,
+		containerName,
 		containerdApi.WithImage(image),
-		containerdApi.WithNewSnapshot(snapshotName, image),
+		containerdApi.WithNewSnapshot(imageName + fmt.Sprint(rand.Intn(9999)), image),
 		containerdApi.WithNewSpec(oci.WithImageConfig(image)),
+
 	)
 	if err != nil {
 		return err
 	}
 	info, _ := container.Info(ctx)
 	snapshotter := client.SnapshotService(info.Snapshotter)
-	mounts, err := snapshotter.Mounts(ctx, snapshotName)
-	path := []string{""}
-	if len(mounts) > 0 {
-		options := mounts[len(mounts)-1].Options
-		path = strings.Split(options[len(options)-1], ":")
+	mounts, err := snapshotter.Mounts(ctx, info.SnapshotKey)
+	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerName
+	_, err = exec.Command("mkdir", target).Output()
+	if err != nil {
+		return err
 	}
-	_, err = exec.Command("tar", "-czvf", outputTarPath, path[len(path)-1]).Output()
+	_, err = exec.Command("bash", "-c",fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))).Output()
+	if err != nil {
+		return err
+	}
+	_, err = exec.Command("tar", "-czvf", outputTarPath, "-C", target, ".").Output()
 	if err != nil {
 		return err
 	}
 	defer container.Delete(ctx, containerdApi.WithSnapshotCleanup)
+	exec.Command("umount", target).Output()
+	exec.Command("rm", "-rf", target).Output()
 	return nil
 }
