@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+	"time"
 )
 
 // New instantiates a new Containerd runtime object
@@ -172,14 +173,18 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	if err != nil {
 		return err
 	}
+	rand.Seed(time.Now().UnixNano())
 	containerName := imageName + fmt.Sprint(rand.Intn(9999))
+	err = image.Unpack(ctx, "")
+	if err != nil {
+		return err
+	}
 	container, err := client.NewContainer(
 		ctx,
 		containerName,
 		containerdApi.WithImage(image),
 		containerdApi.WithNewSnapshot(imageName + fmt.Sprint(rand.Intn(9999)), image),
 		containerdApi.WithNewSpec(oci.WithImageConfig(image)),
-
 	)
 	if err != nil {
 		return err
