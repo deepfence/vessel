@@ -163,20 +163,24 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	ctx := namespaces.WithNamespace(context.Background(), "temp")
 	reader, err := os.Open(imageTarPath)
 	if err != nil {
+		fmt.Println("Error while opening image")
 		return err
 	}
 	imgs, err := client.Import(ctx, reader)
 	if err != nil {
+		fmt.Println("Error while Importing image")
 		return err
 	}
 	image, err := client.GetImage(ctx, imgs[0].Name)
 	if err != nil {
+		fmt.Println("Error while getting image from client")
 		return err
 	}
 	rand.Seed(time.Now().UnixNano())
 	containerName := imageName + fmt.Sprint(rand.Intn(9999))
 	err = image.Unpack(ctx, "")
 	if err != nil {
+		fmt.Println("Error while unpacking image")
 		return err
 	}
 	container, err := client.NewContainer(
@@ -187,6 +191,7 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 		containerdApi.WithNewSpec(oci.WithImageConfig(image)),
 	)
 	if err != nil {
+		fmt.Println("Error while creating container")
 		return err
 	}
 	info, _ := container.Info(ctx)
@@ -195,14 +200,17 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerName
 	_, err = exec.Command("mkdir", target).Output()
 	if err != nil {
+		fmt.Println("Error while creating temp target dir")
 		return err
 	}
 	_, err = exec.Command("bash", "-c",fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))).Output()
 	if err != nil {
+		fmt.Println("Error while mounting image on temp target dir")
 		return err
 	}
 	_, err = exec.Command("tar", "-czvf", outputTarPath, "-C", target, ".").Output()
 	if err != nil {
+		fmt.Println("Error while packing tar")
 		return err
 	}
 	defer container.Delete(ctx, containerdApi.WithSnapshotCleanup)
