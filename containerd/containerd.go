@@ -177,7 +177,7 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 		return err
 	}
 	rand.Seed(time.Now().UnixNano())
-	containerName := imageName + fmt.Sprint(rand.Intn(9999))
+	containerName := "temp" + fmt.Sprint(rand.Intn(9999))
 	err = image.Unpack(ctx, "")
 	if err != nil {
 		fmt.Println("Error while unpacking image")
@@ -187,7 +187,7 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 		ctx,
 		containerName,
 		containerdApi.WithImage(image),
-		containerdApi.WithNewSnapshot(imageName + fmt.Sprint(rand.Intn(9999)), image),
+		containerdApi.WithNewSnapshot("temp" + fmt.Sprint(rand.Intn(9999)), image),
 		containerdApi.WithNewSpec(oci.WithImageConfig(image)),
 	)
 	if err != nil {
