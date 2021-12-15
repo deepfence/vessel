@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -68,29 +69,47 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 	if err != nil {
 		return err
 	}
-	imageId := strings.TrimSpace(strings.Replace(string(imageMsg),"Loaded image: ", "", 1))
-	containerId, err := runCommand(exec.Command("docker", "create", imageId), "docker create: " + imageId)
+	var imageId = ""
+	scanner := bufio.NewScanner(imageMsg)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "Loaded image: ") {
+			imageId = strings.TrimSpace(strings.Replace(line,"Loaded image: ", "", 1))
+			break
+		}
+	}
+	if imageId == "" {
+		return errors.New("image not found from docker load with output: " + string(imageMsg.Bytes()))
+	}
+	containerOutput, err := runCommand(exec.Command("docker", "create", imageId), "docker create: " + imageId)
 	if err != nil {
 		return err
 	}
+	containerId := strings.TrimSpace(string(containerOutput.Bytes()))
 	_, err = runCommand(exec.Command("docker", "export", strings.TrimSpace(string(containerId)), "-o", outputTarPath), "docker export: " + string(containerId))
 	if err != nil {
 		return err
 	}
-	exec.Command("docker", "container", "rm", string(containerId)).Run()
-	exec.Command("docker", "image", "rm", imageId).Run()
+	_, err = runCommand(exec.Command("docker", "container", "rm", string(containerId)), "delete container:" + string(containerId))
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	_, err = runCommand(exec.Command("docker", "image", "rm", imageId), "delete image:" + imageId)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 	return nil
 }
 
 // operation is prepended to error message in case of error: optional
-func runCommand(cmd *exec.Cmd, operation string) (output []byte, err error) {
+func runCommand(cmd *exec.Cmd, operation string) (*bytes.Buffer, error) {
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	errorOnRun := cmd.Run()
 	if errorOnRun != nil {
-		return nil, errors.New(operation + fmt.Sprint(err) + ": " + stderr.String())
+		return nil, errors.New(operation + fmt.Sprint(errorOnRun) + ": " + stderr.String())
 	}
-	return out.Bytes(), nil
+	return &out, nil
 }
