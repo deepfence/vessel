@@ -92,11 +92,11 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 	}
 	_, err = runCommand(exec.Command("docker", "container", "rm", string(containerId)), "delete container:" + string(containerId))
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(err.Error())
 	}
 	_, err = runCommand(exec.Command("docker", "image", "rm", imageId), "delete image:" + imageId)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(err.Error())
 	}
 	return nil
 }
