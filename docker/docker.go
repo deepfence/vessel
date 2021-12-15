@@ -73,9 +73,12 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 	scanner := bufio.NewScanner(imageMsg)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.Contains(line, "Loaded image: ") {
-			imageId = strings.TrimSpace(strings.Replace(line,"Loaded image: ", "", 1))
-			break
+		if strings.Contains(line, "Loaded image") {
+			splits := strings.SplitAfterN(line,":", 2)
+			if len(splits) > 1 {
+				imageId = strings.TrimSpace(splits[1])
+				break
+			}
 		}
 	}
 	if imageId == "" {
