@@ -171,6 +171,10 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 		fmt.Println("Error while Importing image")
 		return err
 	}
+	if len(imgs) == 0 {
+		fmt.Printf("No images imported, imageTarPath: %s, outputTarPath: %s, imageName: %s \n", imageTarPath, outputTarPath, imageName)
+		return errors.New("image not imported from: " + imageTarPath)
+	}
 	image, err := client.GetImage(ctx, imgs[0].Name)
 	if err != nil {
 		fmt.Println("Error while getting image from client")
