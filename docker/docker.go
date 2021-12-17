@@ -74,7 +74,7 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.Contains(line, "Loaded image") {
-			splits := strings.SplitAfterN(line,":", 2)
+			splits := strings.SplitAfterN(line, ":", 2)
 			if len(splits) > 1 {
 				imageId = strings.TrimSpace(splits[1])
 				break
