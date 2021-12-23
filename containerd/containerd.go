@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	containerdApi "github.com/containerd/containerd"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/deepfence/vessel/constants"
@@ -166,7 +168,9 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 		fmt.Println("Error while opening image")
 		return err
 	}
-	imgs, err := client.Import(ctx, reader)
+	imgs, err := client.Import(ctx, reader,
+		containerdApi.WithSkipDigestRef(func(name string) bool { return name != "" }),
+		containerdApi.WithDigestRef(archive.DigestTranslator(imageName)))
 	if err != nil {
 		fmt.Println("Error while Importing image")
 		return err
@@ -217,8 +221,9 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 		fmt.Println("Error while packing tar")
 		return err
 	}
-	defer container.Delete(ctx, containerdApi.WithSnapshotCleanup)
 	exec.Command("umount", target).Output()
 	exec.Command("rm", "-rf", target).Output()
+	container.Delete(ctx, containerdApi.WithSnapshotCleanup)
+	client.ImageService().Delete(ctx, imgs[0].Name, images.SynchronousDelete())
 	return nil
 }
