@@ -9,9 +9,12 @@ const (
 	CONTAINERD                = "containerd"
 	DOCKER                    = "docker"
 	CONTAINERD_SOCKET_ADDRESS = "/run/containerd/containerd.sock"
+	DOCKER_SOCKET_ADDRESS     = "/var/run/docker.sock"
+	CONTAINERD_SOCKET_IRI     = "unix://" + CONTAINERD_SOCKET_ADDRESS
+	DOCKER_SOCKET_IRI         = "unix://" + DOCKER_SOCKET_ADDRESS
 )
 
 var SupportedRuntimes = map[string]string{
-	"unix:///var/run/docker.sock":            DOCKER,
-	"unix:///run/containerd/containerd.sock": CONTAINERD,
+	DOCKER:     DOCKER_SOCKET_IRI,
+	CONTAINERD: CONTAINERD_SOCKET_IRI,
 }

@@ -5,25 +5,44 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	containerdApi "github.com/containerd/containerd"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/images/archive"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/oci"
-	"github.com/deepfence/vessel/constants"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/containerd/containerd"
+	containerdApi "github.com/containerd/containerd"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/images/archive"
+	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/oci"
+	"github.com/deepfence/vessel/constants"
 )
 
 // New instantiates a new Containerd runtime object
 func New() *Containerd {
+	host := "unix:///run/containerd/containerd.sock"
 	return &Containerd{
-		socketPath: "unix:///run/containerd/containerd.sock",
+		socketPath: host,
+		namespaces: getNamespaces(host),
 	}
+}
+
+func getNamespaces(host string) []string {
+	clientd, err := containerd.New(strings.Replace(host, "unix://", "", 1))
+	if err != nil {
+		return nil
+	}
+	defer clientd.Close()
+	namespace_store := clientd.NamespaceService()
+
+	list, err := namespace_store.List(context.Background())
+	if err != nil {
+		return nil
+	}
+	return list
 }
 
 // GetSocket is socket getter
@@ -39,7 +58,7 @@ func (c Containerd) GetSocket() string {
 // docker-archive:/home/ubuntu/img/docker/threatmapper_containerd.tar
 func (c Containerd) ExtractImage(imageID, imageName, path string) error {
 	var stderr bytes.Buffer
-	save := exec.Command("/usr/local/bin/nerdctl", "save", imageName)
+	save := exec.Command("nerdctl", "save", imageName)
 	save.Stderr = &stderr
 	extract := exec.Command("tar", "xf", "-", "--warning=none", "-C"+path)
 	extract.Stderr = &stderr
@@ -75,12 +94,20 @@ func (c Containerd) ExtractImage(imageID, imageName, path string) error {
 
 // GetImageID returns the image id
 func (c Containerd) GetImageID(imageName string) ([]byte, error) {
-	return exec.Command("/usr/local/bin/nerdctl", "images", "-q", "--no-trunc", imageName).Output()
+	return exec.Command("nerdctl", "images", "-q", "--no-trunc", imageName).Output()
 }
 
 // Save just saves image using -o flag
 func (c Containerd) Save(imageName, outputParam string) ([]byte, error) {
-	return exec.Command("/usr/local/bin/nerdctl", "-n", "k8s.io", "save", "-o", outputParam, imageName).Output()
+	nerrors := []error{}
+	for _, ns := range c.namespaces {
+		res, err := exec.Command("nerdctl", "-n", ns, "save", "-o", outputParam, imageName).Output()
+		if err == nil {
+			return res, nil
+		}
+		nerrors = append(nerrors, fmt.Errorf("namespace: %v, err: %v\n", ns, err))
+	}
+	return nil, fmt.Errorf("Save failed. errors:\n%v", nerrors)
 }
 
 // migrateOCIToDockerV1 migrates OCI image to Docker v1 image tarball
@@ -195,7 +222,7 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 		ctx,
 		containerName,
 		containerdApi.WithImage(image),
-		containerdApi.WithNewSnapshot("temp" + fmt.Sprint(rand.Intn(9999)), image),
+		containerdApi.WithNewSnapshot("temp"+fmt.Sprint(rand.Intn(9999)), image),
 		containerdApi.WithNewSpec(oci.WithImageConfig(image)),
 	)
 	if err != nil {
@@ -211,7 +238,7 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 		fmt.Println("Error while creating temp target dir")
 		return err
 	}
-	_, err = exec.Command("bash", "-c",fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))).Output()
+	_, err = exec.Command("bash", "-c", fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))).Output()
 	if err != nil {
 		fmt.Println("Error while mounting image on temp target dir")
 		return err

@@ -76,13 +76,13 @@ func parseEndpoint(endpoint string) (string, string, error) {
 }
 
 // getContainerRuntime returns the underlying container runtime and it's socket path
-func getContainerRuntime(endPoints map[string]string) (string, string, error) {
+func getContainerRuntime(endPoints map[string]string) (string, error) {
 	if endPoints == nil || len(endPoints) == 0 {
-		return "", "", fmt.Errorf("endpoint is not set")
+		return "", fmt.Errorf("endpoint is not set")
 	}
 	var detectedRuntime string
-	var sockPath string
-	for endPoint, runtime := range endPoints {
+	detectedRuntimes := []string{}
+	for runtime, endPoint := range endPoints {
 		logrus.Infof("trying to connect to endpoint '%s' with timeout '%s'", endPoint, constants.Timeout)
 		addr, dialer, err := GetAddressAndDialer(endPoint)
 		if err != nil {
@@ -102,13 +102,13 @@ func getContainerRuntime(endPoints map[string]string) (string, string, error) {
 				logrus.Warn(err)
 				continue
 			}
+			detectedRuntimes = append(detectedRuntimes, runtime)
 			if !running {
 				logrus.Warn(errors.New(fmt.Sprintf("no running containers found with endpoint %s", endPoint)))
 				continue
 			}
 			logrus.Infof("connected successfully using endpoint: %s", endPoint)
 			detectedRuntime = runtime
-			sockPath = endPoint
 			break
 		} else {
 			_, err = grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(constants.Timeout), grpc.WithContextDialer(dialer))
@@ -122,30 +122,34 @@ func getContainerRuntime(endPoints map[string]string) (string, string, error) {
 				logrus.Warn(err)
 				continue
 			}
+			detectedRuntimes = append(detectedRuntimes, runtime)
 			if !running {
 				logrus.Warn(errors.New(fmt.Sprintf("no running containers found with endpoint %s", endPoint)))
 				continue
 			}
 			logrus.Infof("connected successfully using endpoint: %s", endPoint)
 			detectedRuntime = runtime
-			sockPath = endPoint
 			break
 		}
 	}
-	return detectedRuntime, sockPath, nil
+	if detectedRuntime == "" && len(detectedRuntimes) > 0 {
+		logrus.Warn("No running runtimes, selecting first available found")
+		detectedRuntime = detectedRuntimes[0]
+	}
+	return detectedRuntime, nil
 }
 
 // AutoDetectRuntime auto detects the underlying container runtime like docker, containerd
-func AutoDetectRuntime() (string, string, error) {
-	runtime, sockPath, err := getContainerRuntime(constants.SupportedRuntimes)
+func AutoDetectRuntime() (string, error) {
+	runtime, err := getContainerRuntime(constants.SupportedRuntimes)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	if runtime == "" {
-		return "", "", errors.New("could not detect container runtime")
+		return "", errors.New("could not detect container runtime")
 	}
 	logrus.Infof("container runtime detected: %s\n", runtime)
-	return runtime, sockPath, nil
+	return runtime, nil
 }
 
 func isDockerRunning(host string) (bool, error) {
@@ -161,11 +165,7 @@ func isDockerRunning(host string) (bool, error) {
 		return false, errors.Wrapf(err, " :error creating docker client")
 	}
 
-	if len(containers) > 0 {
-		return true, nil
-	}
-
-	return false, nil
+	return len(containers) > 0, nil
 }
 
 func isContainerdRunning(host string) (bool, error) {
@@ -174,27 +174,31 @@ func isContainerdRunning(host string) (bool, error) {
 		return false, errors.Wrapf(err, " :error creating containerd client")
 	}
 	defer clientd.Close()
+	namespace_store := clientd.NamespaceService()
 
-	// create a context for k8s with containerd namespace
-	// TODO: using k8s ns, to support containerd standalone
-	// make this configurable or autodetect
-	k8s := namespaces.WithNamespace(context.Background(), constants.CONTAINERD_K8S_NS)
+	list, err := namespace_store.List(context.Background())
+	for _, l := range list {
 
-	containers, err := clientd.Containers(k8s)
-	if err != nil {
-		return false, errors.Wrapf(err, " :error creating containerd client")
+		namespace := namespaces.WithNamespace(context.Background(), l)
+
+		containers, err := clientd.Containers(namespace)
+		if err != nil {
+			return false, errors.Wrapf(err, " :error creating containerd client")
+		}
+
+		if len(containers) > 0 {
+			return true, nil
+		}
 	}
 
-	if len(containers) > 0 {
-		return true, nil
-	}
 	return false, nil
+
 }
 
 // Auto detect and returns the runtime available for the current system
 func NewRuntime() (Runtime, error) {
 
-	runtime, _, err := AutoDetectRuntime()
+	runtime, err := AutoDetectRuntime()
 	if err != nil {
 		return nil, err
 	}
