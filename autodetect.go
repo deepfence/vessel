@@ -3,17 +3,20 @@ package vessel
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
+	"strings"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/deepfence/vessel/constants"
+	self_containerd "github.com/deepfence/vessel/containerd"
+	"github.com/deepfence/vessel/docker"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-	"net"
-	"net/url"
-	"strings"
 )
 
 func init() {
@@ -186,4 +189,21 @@ func isContainerdRunning(host string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+// Auto detect and returns the runtime available for the current system
+func NewRuntime() (Runtime, error) {
+
+	runtime, _, err := AutoDetectRuntime()
+	if err != nil {
+		return nil, err
+	}
+
+	if runtime == constants.DOCKER {
+		return docker.New(), nil
+	} else if runtime == constants.CONTAINERD {
+		return self_containerd.New(), nil
+	}
+
+	return nil, errors.New("Unknown runtime")
 }
