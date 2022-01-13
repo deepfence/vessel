@@ -5,4 +5,4 @@ Vessel is the Go based utility that autodetects underlying Container Runtime in 
 ## Containerd namespace
 
 Vessel scans every available namespaces from containerd.
-Current behavior conists of issuing a command to every namespace until one succeeds.
+Current behavior consists of issuing a command to every namespace until one succeeds.
