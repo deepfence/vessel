@@ -1,21 +1,22 @@
 package main
 
 import (
-	"github.com/deepfence/vessel"
-	"github.com/joho/godotenv"
-	"github.com/sirupsen/logrus"
 	"log"
 	"os"
+
+	"github.com/deepfence/vessel"
+	"github.com/deepfence/vessel/constants"
+	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
 )
 
 var activeRuntime string
-var sockPath string
 var containerRuntime string
 
 func init() {
 	var err error
 	// Auto-detect underlying container runtime
-	containerRuntime, sockPath, err = vessel.AutoDetectRuntime()
+	containerRuntime, err = vessel.AutoDetectRuntime()
 	if err != nil {
 		logrus.Error(err)
 		os.Exit(1)
@@ -42,7 +43,7 @@ func main() {
 	if activeRuntime != "" {
 		envVars := map[string]string{
 			"CONTAINER_RUNTIME": containerRuntime,
-			"CRI_ENDPOINT":      sockPath,
+			"CRI_ENDPOINT":      constants.SupportedRuntimes[containerRuntime],
 		}
 		setDotEnvVariable(envVars)
 	}
