@@ -205,7 +205,7 @@ func NewRuntime() (Runtime, error) {
 
 	if runtime == constants.DOCKER {
 		return docker.New(), nil
-	} else if runtime == constants.CONTAINERD {
+	} else if runtime == constants.CONTAINERD || runtime == constants.K3S_CONTAINERD {
 		return self_containerd.New(), nil
 	}
 
