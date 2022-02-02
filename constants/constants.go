@@ -7,7 +7,6 @@ const (
 	Timeout                       = 10 * time.Second
 	CONTAINERD_K8S_NS             = "k8s.io"
 	CONTAINERD                    = "containerd"
-	K3S_CONTAINERD                = "k3s_containerd"
 	DOCKER                        = "docker"
 	CONTAINERD_SOCKET_ADDRESS     = "/run/containerd/containerd.sock"
 	K3S_CONTAINERD_SOCKET_ADDRESS = "/run/k3s/containerd/containerd.sock"
@@ -17,8 +16,7 @@ const (
 	K3S_CONTAINERD_SOCKET_IRI     = "unix://" + K3S_CONTAINERD_SOCKET_ADDRESS
 )
 
-var SupportedRuntimes = map[string]string{
-	DOCKER:         DOCKER_SOCKET_IRI,
-	CONTAINERD:     CONTAINERD_SOCKET_IRI,
-	K3S_CONTAINERD: K3S_CONTAINERD_SOCKET_IRI,
+var SupportedRuntimes = map[string][]string{
+	DOCKER:         {DOCKER_SOCKET_IRI},
+	CONTAINERD:     {CONTAINERD_SOCKET_IRI,K3S_CONTAINERD_SOCKET_IRI},
 }

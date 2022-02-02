@@ -22,8 +22,7 @@ import (
 )
 
 // New instantiates a new Containerd runtime object
-func New() *Containerd {
-	host := "unix:///run/containerd/containerd.sock"
+func New(host string) *Containerd {
 	return &Containerd{
 		socketPath: host,
 		namespaces: getNamespaces(host),
