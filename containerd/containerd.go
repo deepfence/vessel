@@ -18,7 +18,6 @@ import (
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
-	"github.com/deepfence/vessel/constants"
 )
 
 // New instantiates a new Containerd runtime object
@@ -180,9 +179,9 @@ func MigrateOCITarToDockerV1Tar(dir, tarName string) error {
 }
 
 // ExtractFileSystem Extract the file system from tar of an image by creating a temporary dormant container instance
-func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string) error {
+func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string, socketPath string) error {
 	// create a new client connected to the default socket path for containerd
-	client, err := containerdApi.New(constants.CONTAINERD_SOCKET_ADDRESS)
+	client, err := containerdApi.New(socketPath)
 	if err != nil {
 		return err
 	}

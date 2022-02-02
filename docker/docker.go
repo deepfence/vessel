@@ -64,7 +64,7 @@ func (d Docker) Save(imageName, outputParam string) ([]byte, error) {
 }
 
 // ExtractFileSystem Extract the file system from tar of an image by creating a temporary dormant container instance
-func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string) error {
+func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string, socketPath string) error {
 	imageMsg, err := runCommand(exec.Command("docker", "load", "-i", imageTarPath), "docker load: " + imageTarPath)
 	if err != nil {
 		return err
