@@ -56,7 +56,7 @@ func (c Containerd) GetSocket() string {
 // docker-archive:/home/ubuntu/img/docker/threatmapper_containerd.tar
 func (c Containerd) ExtractImage(imageID, imageName, path string) error {
 	var stderr bytes.Buffer
-	save := exec.Command("nerdctl", "save", imageName)
+	save := exec.Command("nerdctl", "save", imageName, "--address", c.socketPath)
 	save.Stderr = &stderr
 	extract := exec.Command("tar", "xf", "-", "--warning=none", "-C"+path)
 	extract.Stderr = &stderr
@@ -92,14 +92,14 @@ func (c Containerd) ExtractImage(imageID, imageName, path string) error {
 
 // GetImageID returns the image id
 func (c Containerd) GetImageID(imageName string) ([]byte, error) {
-	return exec.Command("nerdctl", "images", "-q", "--no-trunc", imageName).Output()
+	return exec.Command("nerdctl", "images", "-q", "--no-trunc", imageName, "--address", c.socketPath).Output()
 }
 
 // Save just saves image using -o flag
 func (c Containerd) Save(imageName, outputParam string) ([]byte, error) {
 	nerrors := []error{}
 	for _, ns := range c.namespaces {
-		res, err := exec.Command("nerdctl", "-n", ns, "save", "-o", outputParam, imageName).Output()
+		res, err := exec.Command("nerdctl", "-n", ns, "save", "--address", c.socketPath, "-o", outputParam, imageName).Output()
 		if err == nil {
 			return res, nil
 		}
