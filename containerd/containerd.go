@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/deepfence/vessel/constants"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -250,5 +251,46 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	exec.Command("rm", "-rf", target).Output()
 	container.Delete(ctx, containerdApi.WithSnapshotCleanup)
 	client.ImageService().Delete(ctx, imgs[0].Name, images.SynchronousDelete())
+	return nil
+}
+
+// ExtractFileSystemContainer Extract the file system of an existing container to tar
+func (c Containerd) ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string, socketPath string) error {
+	// create a new client connected to the default socket path for containerd
+	client, err := containerdApi.New(strings.Replace(socketPath, "unix://", "", 1))
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	// create a new context with namespace
+	if len(namespace) == 0 {
+		namespace = constants.CONTAINERD_K8S_NS
+	}
+	ctx := namespaces.WithNamespace(context.Background(), namespace)
+	container, err := client.LoadContainer(ctx, containerId)
+	if err != nil {
+		fmt.Println("Error while getting container")
+		return err
+	}
+	info, _ := container.Info(ctx)
+	snapshotter := client.SnapshotService(info.Snapshotter)
+	mounts, err := snapshotter.Mounts(ctx, info.SnapshotKey)
+	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerId
+	_, err = exec.Command("mkdir", target).Output()
+	if err != nil {
+		fmt.Println("Error while creating temp target dir")
+		return err
+	}
+	_, err = exec.Command("bash", "-c", fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))).Output()
+	if err != nil {
+		fmt.Println("Error while mounting image on temp target dir")
+		return err
+	}
+	_, err = exec.Command("tar", "-czvf", outputTarPath, "-C", target, ".").Output()
+	if err != nil {
+		fmt.Println("Error while packing tar")
+		return err
+	}
+	exec.Command("umount", target).Output()
 	return nil
 }
