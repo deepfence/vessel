@@ -7,4 +7,5 @@ type Runtime interface {
 	Save(imageName, outputParam string) ([]byte, error)
 	GetSocket() string
 	ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string, socketPath string) error
+	ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string, socketPath string) error
 }
