@@ -233,7 +233,7 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	mounts, err := snapshotter.Mounts(ctx, info.SnapshotKey)
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerName
 	_, err = exec.Command("mkdir", target).Output()
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
 		fmt.Println("Error while creating temp target dir", target, err.Error())
 		return err
 	}
@@ -277,7 +277,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	mounts, err := snapshotter.Mounts(ctx, info.SnapshotKey)
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerId
 	_, err = exec.Command("mkdir", target).Output()
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
 		fmt.Println("Error while creating temp target dir", target,  err.Error())
 		return err
 	}
