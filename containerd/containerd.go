@@ -284,8 +284,23 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	var mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
 	_, err = exec.Command("bash", "-c", mountStatement).Output()
 	if err != nil {
-		fmt.Println("Error while mounting image on temp target dir", mountStatement, " err: ", err.Error())
-		return err
+		fmt.Println("error while mounting image on temp target dir", mountStatement, " err: ", err.Error())
+		fmt.Println("Reattempting mount on /fenced/mnt/host")
+		var containerdTmpDirs = []string{"/tmp", "/var/lib"}
+		for index, option := range mounts[0].Options {
+			for _, tmpDir := range containerdTmpDirs {
+				if strings.Contains(option, tmpDir) {
+					mounts[0].Options[index] = strings.Replace(option, tmpDir, "/fenced/mnt/host" + tmpDir, -1)
+				}
+			}
+		}
+		mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
+		_, err = exec.Command("bash", "-c", mountStatement).Output()
+		if err != nil {
+			fmt.Println("error while mounting image on temp target dir 2nd attempt", mountStatement, " err: ", err.Error())
+			return err
+		}
+		fmt.Println("mount success")
 	}
 	_, err = exec.Command("tar", "-czvf", outputTarPath, "-C", target, ".").Output()
 	if err != nil {
