@@ -234,7 +234,7 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerName
 	_, err = exec.Command("mkdir", target).Output()
 	if err != nil {
-		fmt.Println("Error while creating temp target dir")
+		fmt.Println("Error while creating temp target dir", target, err.Error())
 		return err
 	}
 	_, err = exec.Command("bash", "-c", fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))).Output()
@@ -278,7 +278,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerId
 	_, err = exec.Command("mkdir", target).Output()
 	if err != nil {
-		fmt.Println("Error while creating temp target dir")
+		fmt.Println("Error while creating temp target dir", target,  err.Error())
 		return err
 	}
 	_, err = exec.Command("bash", "-c", fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))).Output()
