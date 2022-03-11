@@ -281,14 +281,15 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		fmt.Println("Error while creating temp target dir", target,  err.Error())
 		return err
 	}
-	_, err = exec.Command("bash", "-c", fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))).Output()
+	var mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
+	_, err = exec.Command("bash", "-c", mountStatement).Output()
 	if err != nil {
-		fmt.Println("Error while mounting image on temp target dir")
+		fmt.Println("Error while mounting image on temp target dir", mountStatement, " err: ", err.Error())
 		return err
 	}
 	_, err = exec.Command("tar", "-czvf", outputTarPath, "-C", target, ".").Output()
 	if err != nil {
-		fmt.Println("Error while packing tar")
+		fmt.Println("Error while packing tar", outputTarPath, target, err.Error())
 		return err
 	}
 	exec.Command("umount", target).Output()
