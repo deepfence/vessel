@@ -269,7 +269,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	ctx := namespaces.WithNamespace(context.Background(), namespace)
 	container, err := client.LoadContainer(ctx, containerId)
 	if err != nil {
-		fmt.Println("Error while getting container")
+		fmt.Fprintf(os.Stderr, "Error while getting container")
 		return err
 	}
 	info, _ := container.Info(ctx)
@@ -278,14 +278,14 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerId
 	_, err = exec.Command("mkdir", target).Output()
 	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
-		fmt.Println("Error while creating temp target dir", target,  err.Error())
+		fmt.Fprintf(os.Stderr, "Error while creating temp target dir %s %s", target,  err.Error())
 		return err
 	}
 	var mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
 	_, err = exec.Command("bash", "-c", mountStatement).Output()
 	if err != nil {
-		fmt.Println("error while mounting image on temp target dir", mountStatement, " err: ", err.Error())
-		fmt.Println("Reattempting mount on /fenced/mnt/host")
+		fmt.Fprintf(os.Stderr, "error while mounting image on temp target dir %s %s %s", mountStatement, " err: ", err.Error())
+		fmt.Fprintf(os.Stderr, "Reattempting mount on /fenced/mnt/host")
 		var containerdTmpDirs = []string{"/tmp", "/var/lib"}
 		for index, option := range mounts[0].Options {
 			for _, tmpDir := range containerdTmpDirs {
@@ -297,14 +297,14 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
 		_, err = exec.Command("bash", "-c", mountStatement).Output()
 		if err != nil {
-			fmt.Println("error while mounting image on temp target dir 2nd attempt", mountStatement, " err: ", err.Error())
+			fmt.Fprintf(os.Stderr, "error while mounting image on temp target dir 2nd attempt %s %s %s", mountStatement, " err: ", err.Error())
 			return err
 		}
-		fmt.Println("mount success")
+		fmt.Fprintf(os.Stderr, "mount success")
 	}
 	_, err = exec.Command("tar", "-czvf", outputTarPath, "-C", target, ".").Output()
 	if err != nil {
-		fmt.Println("Error while packing tar", outputTarPath, target, err.Error())
+		fmt.Fprintf(os.Stderr, "Error while packing tar %s %s %s", outputTarPath, target, err.Error())
 		return err
 	}
 	exec.Command("umount", target).Output()
