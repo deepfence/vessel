@@ -315,7 +315,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 			for _, copyDir := range copyDirs {
 				replacedDir := strings.Replace(copyDir, mountedHostPath, targetFs, 1)
 				os.MkdirAll(replacedDir, os.ModePerm)
-				_, err = exec.Command("cp", "-R", copyDir, replacedDir).Output()
+				_, err = exec.Command("cp", "-R", copyDir + "/.", replacedDir).Output()
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error while copying directories %s to %s %s \n", copyDir, replacedDir, err.Error())
 					return err
