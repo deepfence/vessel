@@ -308,7 +308,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 			if occr == 0 {
 				continue
 			} else if occr == 1 {
-				copyDirs[0] = dirs
+				copyDirs = append(copyDirs, dirs)
 			} else if occr > 1 {
 				copyDirs = strings.Split(dirs, ":")
 			}
