@@ -320,7 +320,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 					fmt.Fprintf(os.Stderr, "error while copying directories %s to %s %s \n", copyDir, replacedDir, err.Error())
 					return err
 				}
-				mounts[0].Options[index] = strings.Replace(option, copyDir, replacedDir, -1)
+				mounts[0].Options[index] = strings.Replace(mounts[0].Options[index], copyDir, replacedDir, -1)
 			}
 		}
 		mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s \n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
