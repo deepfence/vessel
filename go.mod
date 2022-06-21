@@ -1,14 +1,14 @@
 module github.com/deepfence/vessel
 
-go 1.17
+go 1.18
 
 require (
 	github.com/containerd/containerd v1.6.6
-	github.com/docker/docker v20.10.9+incompatible
+	github.com/docker/docker v20.10.17+incompatible
 	github.com/joho/godotenv v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
-	google.golang.org/grpc v1.43.0
+	google.golang.org/grpc v1.47.0
 )
 
 require (
