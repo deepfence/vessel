@@ -100,11 +100,11 @@ func (c Containerd) GetImageID(imageName string) ([]byte, error) {
 func (c Containerd) Save(imageName, outputParam string) ([]byte, error) {
 	nerrors := []error{}
 	for _, ns := range c.namespaces {
-		res, err := exec.Command("nerdctl", "-n", ns, "save", "--address", c.socketPath, "-o", outputParam, imageName).Output()
+		res, err := exec.Command("nerdctl", "-n", ns, "save", "--address", c.socketPath, "-o", outputParam, imageName).CombinedOutput()
 		if err == nil {
 			return res, nil
 		}
-		nerrors = append(nerrors, fmt.Errorf("namespace: %v, err: %v\n", ns, err))
+		nerrors = append(nerrors, fmt.Errorf("namespace: %v, err: %v\n", ns, string(res)+err.Error()))
 	}
 	return nil, fmt.Errorf("Save failed. errors:\n%v", nerrors)
 }
