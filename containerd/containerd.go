@@ -57,7 +57,7 @@ func (c Containerd) GetSocket() string {
 // docker-archive:/home/ubuntu/img/docker/threatmapper_containerd.tar
 func (c Containerd) ExtractImage(imageID, imageName, path string) error {
 	var stderr bytes.Buffer
-	save := exec.Command("nerdctl", "save", imageName, "--address", c.socketPath)
+	save := exec.Command("nerdctl ", "save ", imageName, " --address ", c.socketPath)
 	save.Stderr = &stderr
 	extract := exec.Command("tar", "xf", "-", "--warning=none", "-C"+path)
 	extract.Stderr = &stderr
@@ -99,14 +99,16 @@ func (c Containerd) GetImageID(imageName string) ([]byte, error) {
 // Save just saves image using -o flag
 func (c Containerd) Save(imageName, outputParam string) ([]byte, error) {
 	nerrors := []error{}
+	var commandStrings string
 	for _, ns := range c.namespaces {
+		commandStrings += "nerdctl" + "-n" + ns + "save" + "--address" + c.socketPath + "-o" + outputParam + imageName + "\n"
 		res, err := exec.Command("nerdctl", "-n", ns, "save", "--address", c.socketPath, "-o", outputParam, imageName).CombinedOutput()
 		if err == nil {
 			return res, nil
 		}
 		nerrors = append(nerrors, fmt.Errorf("namespace: %v, err: %v\n", ns, string(res)+err.Error()))
 	}
-	return nil, fmt.Errorf("Save failed. errors:\n%v", nerrors)
+	return nil, fmt.Errorf("Save failed. Image name:%s errors:\n%v commands: %s", imageName, nerrors, commandStrings)
 }
 
 // migrateOCIToDockerV1 migrates OCI image to Docker v1 image tarball
