@@ -83,6 +83,7 @@ func getContainerRuntime(endPointsMap map[string][]string) (string, string, erro
 	var detectedRuntime string
 	var detectedEndPoint string
 	var detectedRuntimes []string
+	var detectedEndPoints []string
 	for runtime, endPoints := range endPointsMap {
 		for _, endPoint := range endPoints {
 			logrus.Infof("trying to connect to endpoint '%s' with timeout '%s'", endPoint, constants.Timeout)
@@ -105,6 +106,7 @@ func getContainerRuntime(endPointsMap map[string][]string) (string, string, erro
 					continue
 				}
 				detectedRuntimes = append(detectedRuntimes, runtime)
+				detectedEndPoints = append(detectedEndPoints, endPoint)
 				if !running {
 					logrus.Warn(errors.New(fmt.Sprintf("no running containers found with endpoint %s", endPoint)))
 					continue
@@ -126,6 +128,7 @@ func getContainerRuntime(endPointsMap map[string][]string) (string, string, erro
 					continue
 				}
 				detectedRuntimes = append(detectedRuntimes, runtime)
+				detectedEndPoints = append(detectedEndPoints, endPoint)
 				if !running {
 					logrus.Warn(errors.New(fmt.Sprintf("no running containers found with endpoint %s", endPoint)))
 					continue
@@ -140,6 +143,7 @@ func getContainerRuntime(endPointsMap map[string][]string) (string, string, erro
 	if detectedRuntime == "" && len(detectedRuntimes) > 0 {
 		logrus.Warn("No running runtimes, selecting first available found")
 		detectedRuntime = detectedRuntimes[0]
+		detectedEndPoint = detectedEndPoints[0]
 	}
 	return detectedRuntime, detectedEndPoint, nil
 }

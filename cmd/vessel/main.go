@@ -1,12 +1,10 @@
 package main
 
 import (
-	"log"
-	"os"
-
 	"github.com/deepfence/vessel"
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
+	"os"
 )
 
 var activeRuntime string
@@ -15,15 +13,17 @@ var activeEndpoint string
 func init() {
 	var err error
 	// Auto-detect underlying container runtime
-	containerRuntime, endpoint, err := vessel.AutoDetectRuntime()
+	activeRuntime, activeEndpoint, err = vessel.AutoDetectRuntime()
 	if err != nil {
 		logrus.Error(err)
-		os.Exit(1)
+		return
 	}
-	activeRuntime = containerRuntime
-	activeEndpoint = endpoint
 	// create .env
-	os.Create(".env")
+	_, err = os.Create(".env")
+	if err != nil {
+		logrus.Error(err)
+		return
+	}
 }
 
 // use godot package to load/read the .env file and
@@ -31,11 +31,9 @@ func init() {
 func setDotEnvVariable(envars map[string]string) error {
 	// load .env file
 	err := godotenv.Load(".env")
-
 	if err != nil {
-		log.Fatalf("Error loading .env file")
+		return err
 	}
-
 	return godotenv.Write(envars, "./.env")
 }
 
@@ -45,6 +43,9 @@ func main() {
 			"CONTAINER_RUNTIME": activeRuntime,
 			"CRI_ENDPOINT":      activeEndpoint,
 		}
-		setDotEnvVariable(envVars)
+		err := setDotEnvVariable(envVars)
+		if err != nil {
+			logrus.Error(err)
+		}
 	}
 }
