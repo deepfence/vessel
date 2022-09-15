@@ -278,7 +278,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerId
 	_, err = exec.Command("mkdir", target).Output()
 	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
-		fmt.Fprintf(os.Stderr, "Error while creating temp target dir %s %s \n", target,  err.Error())
+		fmt.Fprintf(os.Stderr, "Error while creating temp target dir %s %s \n", target, err.Error())
 		return err
 	}
 	var mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
@@ -292,7 +292,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		for index, option := range mounts[0].Options {
 			for _, tmpDir := range containerdTmpDirs {
 				if strings.Contains(option, tmpDir) {
-					mounts[0].Options[index] = strings.Replace(option, tmpDir, mountedHostPath + tmpDir, -1)
+					mounts[0].Options[index] = strings.Replace(option, tmpDir, mountedHostPath+tmpDir, -1)
 					if strings.Index(mounts[0].Options[index], "upperdir") >= 0 {
 						upperDir = strings.Split(mounts[0].Options[index], "=")[1]
 					} else if strings.Index(mounts[0].Options[index], "workdir") >= 0 {
@@ -303,7 +303,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 				}
 			}
 		}
-		mountStatement = fmt.Sprintf("mount -t %s %s %s -o index=off,lowerdir=%s \n", mounts[0].Type, mounts[0].Source, target, workDir + ":" + upperDir + ":" + lowerDir)
+		mountStatement = fmt.Sprintf("mount -t %s %s %s -o index=off,lowerdir=%s \n", mounts[0].Type, mounts[0].Source, target, workDir+":"+upperDir+":"+lowerDir)
 		_, err = exec.Command("bash", "-c", mountStatement).Output()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error while mounting image on temp target dir 2nd attempt %s %s %s \n", mountStatement, " err: ", err.Error())
