@@ -75,14 +75,14 @@ func parseEndpoint(endpoint string) (string, string, error) {
 	}
 }
 
-// getContainerRuntime returns the underlying container runtime and it's socket path
-func getContainerRuntime(endPointsMap map[string][]string) (string, string,  error) {
+// getContainerRuntime returns the underlying container runtime, and it's socket path
+func getContainerRuntime(endPointsMap map[string][]string) (string, string, error) {
 	if endPointsMap == nil || len(endPointsMap) == 0 {
 		return "", "", fmt.Errorf("endpoint is not set")
 	}
 	var detectedRuntime string
 	var detectedEndPoint string
-	detectedRuntimes := []string{}
+	var detectedRuntimes []string
 	for runtime, endPoints := range endPointsMap {
 		for _, endPoint := range endPoints {
 			logrus.Infof("trying to connect to endpoint '%s' with timeout '%s'", endPoint, constants.Timeout)
