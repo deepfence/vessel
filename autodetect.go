@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os/exec"
 	"strings"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/deepfence/vessel/constants"
 	self_containerd "github.com/deepfence/vessel/containerd"
+	"github.com/deepfence/vessel/crio"
 	"github.com/deepfence/vessel/docker"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -115,7 +117,7 @@ func getContainerRuntime(endPointsMap map[string][]string) (string, string, erro
 				detectedRuntime = runtime
 				detectedEndPoint = endPoint
 				break
-			} else {
+			} else if runtime == constants.CONTAINERD {
 				_, err = grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(constants.Timeout), grpc.WithContextDialer(dialer))
 				if err != nil {
 					errMsg := errors.Wrapf(err, "could not connect to endpoint '%s'", endPoint)
@@ -123,6 +125,28 @@ func getContainerRuntime(endPointsMap map[string][]string) (string, string, erro
 					continue
 				}
 				running, err := isContainerdRunning(endPoint)
+				if err != nil {
+					logrus.Warn(err)
+					continue
+				}
+				detectedRuntimes = append(detectedRuntimes, runtime)
+				detectedEndPoints = append(detectedEndPoints, endPoint)
+				if !running {
+					logrus.Warn(errors.New(fmt.Sprintf("no running containers found with endpoint %s", endPoint)))
+					continue
+				}
+				logrus.Infof("connected successfully using endpoint: %s", endPoint)
+				detectedRuntime = runtime
+				detectedEndPoint = endPoint
+				break
+			} else if runtime == constants.CRIO {
+				_, err = net.DialTimeout(constants.UnixProtocol, addr, constants.Timeout)
+				if err != nil {
+					errMsg := errors.Wrapf(err, "could not connect to endpoint '%s'", endPoint)
+					logrus.Warn(errMsg)
+					continue
+				}
+				running, err := isCRIORunning(endPoint)
 				if err != nil {
 					logrus.Warn(err)
 					continue
@@ -204,6 +228,14 @@ func isContainerdRunning(host string) (bool, error) {
 
 }
 
+func isCRIORunning(host string) (bool, error) {
+	_, err := exec.Command("crictl", "ps", "-q", "--runtime-endpoint", host).Output()
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // Auto detect and returns the runtime available for the current system
 func NewRuntime() (Runtime, error) {
 
@@ -216,6 +248,8 @@ func NewRuntime() (Runtime, error) {
 		return docker.New(), nil
 	} else if runtime == constants.CONTAINERD {
 		return self_containerd.New(endpoint), nil
+	} else if runtime == constants.CRIO {
+		return crio.New(endpoint), nil
 	}
 
 	return nil, errors.New("Unknown runtime")
