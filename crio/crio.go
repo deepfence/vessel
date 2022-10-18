@@ -3,6 +3,8 @@ package crio
 import (
 	"errors"
 	"os/exec"
+
+	"github.com/sirupsen/logrus"
 )
 
 // New instantiates a new CRIO runtime object
@@ -24,9 +26,10 @@ func (c CRIO) GetSocket() string {
 // skopeo copy oci:///home/ubuntu/img/docker/threatmapper_containerd-dir \
 // docker-archive:/home/ubuntu/img/docker/threatmapper_containerd.tar
 func (c CRIO) ExtractImage(imageID, imageName, path string) error {
-	_, err := exec.Command("podman", "save", "--events-backend", "file",
-		"--format", "docker-dir", "--output", path, imageName).Output()
-	if err != nil {
+	cmd := exec.Command("podman", "save", "--events-backend", "file",
+		"--format", "docker-dir", "--output", path, imageName)
+	logrus.Info(cmd.String())
+	if _, err := cmd.Output(); err != nil {
 		return err
 	}
 	return nil
@@ -34,14 +37,18 @@ func (c CRIO) ExtractImage(imageID, imageName, path string) error {
 
 // GetImageID returns the image id
 func (c CRIO) GetImageID(imageName string) ([]byte, error) {
-	return exec.Command("podman", "inspect", imageName,
-		"--type", "image", "--format", "{{ .ID }}").Output()
+	cmd := exec.Command("podman", "inspect", imageName,
+		"--type", "image", "--format", "{{ .ID }}")
+	logrus.Info(cmd.String())
+	return cmd.Output()
 }
 
 // Save just saves image using -o flag
 func (c CRIO) Save(imageName, outputParam string) ([]byte, error) {
-	return exec.Command("podman", "save", "--events-backend", "file",
-		"--format", "docker-archive", "--output", outputParam, imageName).Output()
+	cmd := exec.Command("podman", "save", "--events-backend", "file",
+		"--format", "docker-archive", "--output", outputParam, imageName)
+	logrus.Info(cmd.String())
+	return cmd.Output()
 }
 
 // ExtractFileSystem Extract the file system from tar of an image by creating a temporary dormant container instance
@@ -59,5 +66,5 @@ func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string, o
 	// 	return err
 	// }
 
-	return nil
+	return errors.New("function not implemented for cri-o")
 }
