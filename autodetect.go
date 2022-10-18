@@ -229,8 +229,11 @@ func isContainerdRunning(host string) (bool, error) {
 }
 
 func isCRIORunning(host string) (bool, error) {
-	_, err := exec.Command("crictl", "ps", "-q", "--runtime-endpoint", host).Output()
+	cmd := exec.Command("crictl", "--runtime-endpoint", host, "ps", "-q")
+	logrus.Infof("command: %s", cmd.String())
+	output, err := cmd.Output()
 	if err != nil {
+		logrus.Error("%s, error: %s", output, err)
 		return false, err
 	}
 	return true, nil
