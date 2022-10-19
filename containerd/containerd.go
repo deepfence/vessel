@@ -5,13 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/deepfence/vessel/constants"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/deepfence/vessel/constants"
 
 	"github.com/containerd/containerd"
 	containerdApi "github.com/containerd/containerd"
@@ -303,7 +304,8 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 				}
 			}
 		}
-		mountStatement = fmt.Sprintf("mount -t %s %s %s -o index=off,lowerdir=%s \n", mounts[0].Type, mounts[0].Source, target, workDir+":"+upperDir+":"+lowerDir)
+		mountStatement = fmt.Sprintf("mount -t %s %s %s -o index=off,lowerdir=%s \n",
+			mounts[0].Type, mounts[0].Source, target, workDir+":"+upperDir+":"+lowerDir)
 		_, err = exec.Command("bash", "-c", mountStatement).Output()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error while mounting image on temp target dir 2nd attempt %s %s %s \n", mountStatement, " err: ", err.Error())
