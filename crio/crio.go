@@ -46,7 +46,7 @@ func (c CRIO) GetImageID(imageName string) ([]byte, error) {
 // Save just saves image using -o flag
 func (c CRIO) Save(imageName, outputParam string) ([]byte, error) {
 	cmd := exec.Command("podman", "save", "--events-backend", "file",
-		"--format", "oci-archive", "--output", outputParam, imageName)
+		"--format", "docker-archive", "--output", outputParam, imageName)
 	logrus.Info(cmd.String())
 	return cmd.Output()
 }
