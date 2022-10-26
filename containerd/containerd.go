@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/deepfence/vessel/constants"
+	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd"
 	containerdApi "github.com/containerd/containerd"
@@ -283,7 +284,9 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		return err
 	}
 	var mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
-	_, err = exec.Command("bash", "-c", mountStatement).Output()
+	cmd := exec.Command("bash", "-c", mountStatement)
+	logrus.Info("mount command: %s", cmd.String())
+	_, err = cmd.Output()
 	if err != nil {
 		mountedHostPath := "/fenced/mnt/host"
 		fmt.Fprintf(os.Stderr, "error while mounting image on temp target dir %s %s %s \n", mountStatement, " err: ", err.Error())
@@ -306,7 +309,9 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		}
 		mountStatement = fmt.Sprintf("mount -t %s %s %s -o index=off,lowerdir=%s \n",
 			mounts[0].Type, mounts[0].Source, target, workDir+":"+upperDir+":"+lowerDir)
-		_, err = exec.Command("bash", "-c", mountStatement).Output()
+		cmd := exec.Command("bash", "-c", mountStatement)
+		logrus.Info("mount command: %s", cmd.String())
+		_, err := cmd.Output()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error while mounting image on temp target dir 2nd attempt %s %s %s \n", mountStatement, " err: ", err.Error())
 			return err

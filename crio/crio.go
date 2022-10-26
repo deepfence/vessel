@@ -58,13 +58,18 @@ func (c CRIO) ExtractFileSystem(imageTarPath string, outputTarPath string, image
 
 // ExtractFileSystemContainer Extract the file system of an existing container to tar
 func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string, socketPath string) error {
-	// rootpath, err := exec.Command("crictl", "inspect",
-	// 	"--runtime-endpoint", c.socketPath,
-	// 	"--output", "go-template ",
-	// 	"--template ", "{{ .info.runtimeSpec.root.path }}", containerId).Output()
-	// if err != nil {
-	// 	return err
-	// }
+	cmd := exec.Command(
+		"crictl",
+		"inspect",
+		"--runtime-endpoint", c.socketPath,
+		"--output", "go-template ",
+		"--template ", "{{ .info.runtimeSpec.root.path }}", containerId)
+	logrus.Infof("command: %s", cmd.String())
+	rootpath, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+	logrus.Infof("rootPath: %s", rootpath)
 
 	return errors.New("function not implemented for cri-o")
 }
