@@ -3,6 +3,7 @@ package crio
 import (
 	"errors"
 	"os/exec"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -14,57 +15,75 @@ func New(host string) *CRIO {
 	}
 }
 
-// GetSocket is socket getter
 func (c CRIO) GetSocket() string {
 	return c.socketPath
 }
 
-// ExtractImage will create the tarball from the CRIO image, extracts into dir
-// and then skopeo is used to migrate oci layers using the dir to docker v1 layer spec format tar
-// and again extracts back to dir
-// example:
-// skopeo copy oci:///home/ubuntu/img/docker/threatmapper_containerd-dir \
-// docker-archive:/home/ubuntu/img/docker/threatmapper_containerd.tar
 func (c CRIO) ExtractImage(imageID, imageName, path string) error {
 	cmd := exec.Command("podman", "save", "--events-backend", "file",
 		"--format", "docker-dir", "--output", path, imageName)
-	logrus.Info(cmd.String())
+	logrus.Infof("extract image command: %s", cmd.String())
 	if _, err := cmd.Output(); err != nil {
 		return err
 	}
 	return nil
 }
 
-// GetImageID returns the image id
 func (c CRIO) GetImageID(imageName string) ([]byte, error) {
 	cmd := exec.Command("podman", "inspect", imageName,
 		"--type", "image", "--format", "{{ .ID }}")
-	logrus.Info(cmd.String())
+	logrus.Infof("get imageID command: %s", cmd.String())
 	return cmd.Output()
 }
 
-// Save just saves image using -o flag
 func (c CRIO) Save(imageName, outputParam string) ([]byte, error) {
 	cmd := exec.Command("podman", "save", "--events-backend", "file",
 		"--format", "docker-archive", "--output", outputParam, imageName)
-	logrus.Info(cmd.String())
+	logrus.Infof("save image command: %s", cmd.String())
 	return cmd.Output()
 }
 
-// ExtractFileSystem Extract the file system from tar of an image by creating a temporary dormant container instance
-func (c CRIO) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string, socketPath string) error {
+func (c CRIO) ExtractFileSystem(imageTarPath string, outputTarPath string,
+	imageName string, socketPath string) error {
 	return errors.New("function not implemented for cri-o")
 }
 
-// ExtractFileSystemContainer Extract the file system of an existing container to tar
-func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string, socketPath string) error {
-	// rootpath, err := exec.Command("crictl", "inspect",
-	// 	"--runtime-endpoint", c.socketPath,
-	// 	"--output", "go-template ",
-	// 	"--template ", "{{ .info.runtimeSpec.root.path }}", containerId).Output()
-	// if err != nil {
-	// 	return err
-	// }
+func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string,
+	outputTarPath string, socketPath string) error {
 
-	return errors.New("function not implemented for cri-o")
+	// inspect doesnot accept runtime endpoint option
+	_, _ = exec.Command(
+		"crictl",
+		"config",
+		"--set", "runtime-endpoint="+c.socketPath).Output()
+	// get root path
+	cmd := exec.Command(
+		"crictl",
+		"inspect",
+		"--output", "go-template",
+		"--template", "\"{{ .info.runtimeSpec.root.path }}\"", containerId)
+	logrus.Infof("contaier root path command: %s", cmd.String())
+	rootpath, err := cmd.Output()
+	if err != nil {
+		logrus.Errorf("failed to get container root path error %s", err)
+		return err
+	}
+
+	cleanrootpath := strings.Trim(strings.TrimSpace(string(rootpath)), "\"")
+	logrus.Infof("containerId: %s rootPath: %s", containerId, cleanrootpath)
+
+	if len(rootpath) < 1 {
+		logrus.Errorf("container root path is empty for containerID %s", containerId)
+		return errors.New("container root path is empty")
+	}
+
+	cmd = exec.Command("tar", "-czvf", outputTarPath, "-C", cleanrootpath, ".")
+	logrus.Infof("tar command: %s", cmd.String())
+	if _, err := cmd.Output(); err != nil {
+		logrus.Errorf("error while packing tar containerId: %s file: %s path: %s error: %s",
+			containerId, outputTarPath, rootpath, err)
+		return err
+	}
+
+	return nil
 }
