@@ -59,8 +59,8 @@ func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string,
 	cmd := exec.Command(
 		"crictl",
 		"inspect",
-		"--output", "go-template ",
-		"--template ", "{{ .info.runtimeSpec.root.path }}", containerId)
+		"--output", "go-template",
+		"--template", "\"{{ .info.runtimeSpec.root.path }}\"", containerId)
 	logrus.Infof("contaier root path command: %s", cmd.String())
 	rootpath, err := cmd.Output()
 	if err != nil {
