@@ -3,6 +3,7 @@ package crio
 import (
 	"errors"
 	"os/exec"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -67,14 +68,16 @@ func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string,
 		logrus.Errorf("failed to get container root path error %s", err)
 		return err
 	}
-	logrus.Infof("containerId: %s rootPath: %s", containerId, rootpath)
+
+	cleanrootpath := strings.Trim(string(rootpath), "\"")
+	logrus.Infof("containerId: %s rootPath: %s", containerId, cleanrootpath)
 
 	if len(rootpath) < 1 {
 		logrus.Errorf("container root path is empty for containerID %s", containerId)
 		return errors.New("container root path is empty")
 	}
 
-	cmd = exec.Command("tar", "-czvf", outputTarPath, "-C", string(rootpath), ".")
+	cmd = exec.Command("tar", "-czvf", outputTarPath, "-C", cleanrootpath, ".")
 	logrus.Infof("tar command: %s", cmd.String())
 	if _, err := cmd.Output(); err != nil {
 		logrus.Errorf("error while packing tar containerId: %s file: %s path: %s error: %s",
