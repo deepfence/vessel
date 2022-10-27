@@ -285,7 +285,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	}
 	var mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
 	cmd := exec.Command("bash", "-c", mountStatement)
-	logrus.Info("mount command: %s", cmd.String())
+	logrus.Infof("mount command: %s", cmd.String())
 	_, err = cmd.Output()
 	if err != nil {
 		mountedHostPath := "/fenced/mnt/host"
@@ -310,7 +310,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		mountStatement = fmt.Sprintf("mount -t %s %s %s -o index=off,lowerdir=%s \n",
 			mounts[0].Type, mounts[0].Source, target, workDir+":"+upperDir+":"+lowerDir)
 		cmd := exec.Command("bash", "-c", mountStatement)
-		logrus.Info("mount command: %s", cmd.String())
+		logrus.Infof("mount command: %s", cmd.String())
 		_, err := cmd.Output()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error while mounting image on temp target dir 2nd attempt %s %s %s \n", mountStatement, " err: ", err.Error())
