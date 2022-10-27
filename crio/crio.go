@@ -69,7 +69,7 @@ func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string,
 		return err
 	}
 
-	cleanrootpath := strings.Trim(string(rootpath), "\"")
+	cleanrootpath := strings.Trim(strings.TrimSpace(string(rootpath)), "\"")
 	logrus.Infof("containerId: %s rootPath: %s", containerId, cleanrootpath)
 
 	if len(rootpath) < 1 {
