@@ -49,15 +49,22 @@ func (c CRIO) ExtractFileSystem(imageTarPath string, outputTarPath string,
 
 func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string,
 	outputTarPath string, socketPath string) error {
+
+	// inspect doesnot accept runtime endpoint option
+	_, _ = exec.Command(
+		"crictl",
+		"config",
+		"--set", "runtime-endpoint="+c.socketPath).Output()
+	// get root path
 	cmd := exec.Command(
 		"crictl",
 		"inspect",
-		"--runtime-endpoint", c.socketPath,
 		"--output", "go-template ",
 		"--template ", "{{ .info.runtimeSpec.root.path }}", containerId)
 	logrus.Infof("contaier root path command: %s", cmd.String())
 	rootpath, err := cmd.Output()
 	if err != nil {
+		logrus.Errorf("failed to get container root path error %s", err)
 		return err
 	}
 	logrus.Infof("containerId: %s rootPath: %s", containerId, rootpath)
