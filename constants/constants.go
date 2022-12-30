@@ -7,7 +7,7 @@ import (
 
 const (
 	UnixProtocol                  = "unix"
-	Timeout                       = 10 * time.Second
+	Timeout                       = 8 * time.Second
 	CONTAINERD_K8S_NS             = "k8s.io"
 	CONTAINERD                    = "containerd"
 	DOCKER                        = "docker"
