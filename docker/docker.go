@@ -108,8 +108,6 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 
 // ExtractFileSystemContainer Extract the file system of an existing container to tar
 func (d Docker) ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string, socketPath string) error {
-	log.Infof("containerId=%s namespace=%s outputTarPath=%s socketPath=%s",
-		containerId, namespace, outputTarPath, socketPath)
 	cmd := exec.Command("docker", "export", strings.TrimSpace(containerId), "-o", outputTarPath)
 	_, err := runCommand(cmd, "docker export: "+string(containerId))
 	if err != nil {
