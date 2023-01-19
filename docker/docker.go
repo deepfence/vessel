@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 // New instantiates a new Docker runtime object
@@ -113,21 +115,21 @@ func (d Docker) ExtractFileSystemContainer(containerId string, namespace string,
 	return nil
 }
 
-
-
 // ExtractFileSystemContainer Extract the file system of an existing container to tar
 func (d Docker) GetFileSystemPathsForContainer(containerId string, namespace string) ([]byte, error) {
-	return exec.Command("docker", "inspect", strings.TrimSpace(containerId), "|", "jq" , "-r" , "'map([.Name, .GraphDriver.Data.MergedDir]) | .[] | \"\\(.[0])\t\\(.[1])\"'").Output()
+	return exec.Command("docker", "inspect", strings.TrimSpace(containerId), "|", "jq", "-r", "'map([.Name, .GraphDriver.Data.MergedDir]) | .[] | \"\\(.[0])\t\\(.[1])\"'").Output()
 }
 
 // operation is prepended to error message in case of error: optional
 func runCommand(cmd *exec.Cmd, operation string) (*bytes.Buffer, error) {
+	logrus.Infof("cmd: %s", cmd.String())
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	errorOnRun := cmd.Run()
 	if errorOnRun != nil {
+		logrus.Error(errorOnRun)
 		return nil, errors.New(operation + fmt.Sprint(errorOnRun) + ": " + stderr.String())
 	}
 	return &out, nil
