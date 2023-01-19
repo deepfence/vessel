@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // New instantiates a new Docker runtime object
@@ -88,7 +90,7 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 	if err != nil {
 		return err
 	}
-	containerId := strings.TrimSpace(string(containerOutput.Bytes()))
+	containerId := strings.TrimSpace(containerOutput.String())
 	_, err = runCommand(exec.Command("docker", "export", strings.TrimSpace(containerId), "-o", outputTarPath), "docker export: "+string(containerId))
 	if err != nil {
 		return err
@@ -106,28 +108,30 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 
 // ExtractFileSystemContainer Extract the file system of an existing container to tar
 func (d Docker) ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string, socketPath string) error {
-	_, err := runCommand(exec.Command("docker", "export", strings.TrimSpace(containerId), "-o", outputTarPath), "docker export: "+string(containerId))
+	cmd := exec.Command("docker", "export", strings.TrimSpace(containerId), "-o", outputTarPath)
+	_, err := runCommand(cmd, "docker export: "+string(containerId))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-
-
 // ExtractFileSystemContainer Extract the file system of an existing container to tar
 func (d Docker) GetFileSystemPathsForContainer(containerId string, namespace string) ([]byte, error) {
-	return exec.Command("docker", "inspect", strings.TrimSpace(containerId), "|", "jq" , "-r" , "'map([.Name, .GraphDriver.Data.MergedDir]) | .[] | \"\\(.[0])\t\\(.[1])\"'").Output()
+	return exec.Command("docker", "inspect", strings.TrimSpace(containerId), "|", "jq", "-r", "'map([.Name, .GraphDriver.Data.MergedDir]) | .[] | \"\\(.[0])\t\\(.[1])\"'").Output()
 }
 
 // operation is prepended to error message in case of error: optional
 func runCommand(cmd *exec.Cmd, operation string) (*bytes.Buffer, error) {
+
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	errorOnRun := cmd.Run()
 	if errorOnRun != nil {
+		log.Error("cmd: %s", cmd.String())
+		log.Error(errorOnRun)
 		return nil, errors.New(operation + fmt.Sprint(errorOnRun) + ": " + stderr.String())
 	}
 	return &out, nil
