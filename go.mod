@@ -3,7 +3,7 @@ module github.com/deepfence/vessel
 go 1.19
 
 require (
-	github.com/containerd/containerd v1.6.14
+	github.com/containerd/containerd v1.6.18
 	github.com/docker/docker v20.10.22+incompatible
 	github.com/joho/godotenv v1.4.0
 	github.com/pkg/errors v0.9.1
