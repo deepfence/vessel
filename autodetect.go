@@ -3,6 +3,12 @@ package vessel
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
+	"os/exec"
+	"strings"
+	"sync"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/deepfence/vessel/constants"
@@ -15,11 +21,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"net"
-	"net/url"
-	"os/exec"
-	"strings"
-	"sync"
 )
 
 func init() {
@@ -225,7 +226,7 @@ func isDockerRunning(host string) (bool, error) {
 	}
 	defer dockerCli.Close()
 	containers, err := dockerCli.ContainerList(context.Background(), types.ContainerListOptions{
-		Quiet: true, All: true, Size: false,
+		All: true, Size: false,
 	})
 	if err != nil {
 		return false, errors.Wrapf(err, " :error creating docker client")
