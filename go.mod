@@ -1,6 +1,6 @@
 module github.com/deepfence/vessel
 
-go 1.20
+go 1.19
 
 require (
 	github.com/containerd/containerd v1.6.18
