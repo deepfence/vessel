@@ -1,14 +1,14 @@
 module github.com/deepfence/vessel
 
-go 1.19
+go 1.20
 
 require (
-	github.com/containerd/containerd v1.6.14
-	github.com/docker/docker v20.10.22+incompatible
-	github.com/joho/godotenv v1.4.0
+	github.com/containerd/containerd v1.6.18
+	github.com/docker/docker v23.0.1+incompatible
+	github.com/joho/godotenv v1.5.1
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
-	google.golang.org/grpc v1.51.0
+	google.golang.org/grpc v1.53.0
 )
 
 require (
@@ -27,7 +27,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/uuid v1.2.0 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/klauspost/compress v1.11.13 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/sys/mountinfo v0.5.0 // indirect
@@ -38,10 +38,10 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/opencontainers/selinux v1.10.1 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
+	golang.org/x/net v0.5.0 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
-	golang.org/x/text v0.4.0 // indirect
-	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
+	golang.org/x/sys v0.4.0 // indirect
+	golang.org/x/text v0.6.0 // indirect
+	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 )
