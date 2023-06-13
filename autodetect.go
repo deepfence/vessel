@@ -11,10 +11,10 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/deepfence/vessel/constants"
 	self_containerd "github.com/deepfence/vessel/containerd"
 	"github.com/deepfence/vessel/crio"
 	"github.com/deepfence/vessel/docker"
+	"github.com/deepfence/vessel/utils"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
@@ -32,11 +32,11 @@ func init() {
 
 // GetAddressAndDialer returns the address parsed from the given endpoint and a context dialer.
 func GetAddressAndDialer(endpoint string) (string, func(ctx context.Context, addr string) (net.Conn, error), error) {
-	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, constants.UnixProtocol)
+	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, utils.UnixProtocol)
 	if err != nil {
 		return "", nil, err
 	}
-	if protocol != constants.UnixProtocol {
+	if protocol != utils.UnixProtocol {
 		return "", nil, fmt.Errorf("only support unix socket endpoint")
 	}
 
@@ -44,7 +44,7 @@ func GetAddressAndDialer(endpoint string) (string, func(ctx context.Context, add
 }
 
 func dial(ctx context.Context, addr string) (net.Conn, error) {
-	return (&net.Dialer{}).DialContext(ctx, constants.UnixProtocol, addr)
+	return (&net.Dialer{}).DialContext(ctx, utils.UnixProtocol, addr)
 }
 
 func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string) (protocol string, addr string, err error) {
@@ -84,7 +84,7 @@ func checkDockerRuntime(endPoint string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	_, err = net.DialTimeout(constants.UnixProtocol, addr, constants.Timeout)
+	_, err = net.DialTimeout(utils.UnixProtocol, addr, utils.Timeout)
 	if err != nil {
 		return false, errors.New("could not connect to endpoint '" + endPoint + "'")
 	}
@@ -93,7 +93,7 @@ func checkDockerRuntime(endPoint string) (bool, error) {
 		return false, err
 	}
 	if !running {
-		logrus.Debugf(fmt.Sprintf("no running containers found with endpoint %s", endPoint))
+		logrus.Debugf("no running containers found with endpoint %s", endPoint)
 		return false, nil
 	}
 	return true, nil
@@ -104,7 +104,7 @@ func checkContainerdRuntime(endPoint string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), constants.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), utils.Timeout)
 	defer cancel()
 	_, err = grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock(), grpc.WithContextDialer(dialer))
 	if err != nil {
@@ -115,7 +115,7 @@ func checkContainerdRuntime(endPoint string) (bool, error) {
 		return false, err
 	}
 	if !running {
-		logrus.Debugf(fmt.Sprintf("no running containers found with endpoint %s", endPoint))
+		logrus.Debugf("no running containers found with endpoint %s", endPoint)
 		return false, nil
 	}
 	return true, nil
@@ -126,7 +126,7 @@ func checkCrioRuntime(endPoint string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	_, err = net.DialTimeout(constants.UnixProtocol, addr, constants.Timeout)
+	_, err = net.DialTimeout(utils.UnixProtocol, addr, utils.Timeout)
 	if err != nil {
 		return false, errors.New("could not connect to endpoint '" + endPoint + "'")
 	}
@@ -135,7 +135,7 @@ func checkCrioRuntime(endPoint string) (bool, error) {
 		return false, err
 	}
 	if !running {
-		logrus.Debugf(fmt.Sprintf("no running containers found with endpoint %s", endPoint))
+		logrus.Debugf("no running containers found with endpoint %s", endPoint)
 		return false, nil
 	}
 	return true, nil
@@ -154,22 +154,22 @@ func getContainerRuntime() (string, string, error) {
 	var connectedRuntimes []containerRuntime
 	detectedRuntimeChannel := make(chan containerRuntime, 1)
 
-	for runtime, endPoints := range constants.SupportedRuntimes {
+	for runtime, endPoints := range utils.SupportedRuntimes {
 		for _, endPoint := range endPoints {
 			wg.Add(1)
 			go func(runtime, endPoint string) {
-				logrus.Debugf("trying to connect to endpoint '%s' with timeout '%s'", endPoint, constants.Timeout)
+				logrus.Debugf("trying to connect to endpoint '%s' with timeout '%s'", endPoint, utils.Timeout)
 				var connected bool
 				var err error
 				switch runtime {
-				case constants.DOCKER:
+				case utils.DOCKER:
 					connected, err = checkDockerRuntime(endPoint)
-				case constants.CONTAINERD:
+				case utils.CONTAINERD:
 					connected, err = checkContainerdRuntime(endPoint)
-				case constants.CRIO:
+				case utils.CRIO:
 					connected, err = checkCrioRuntime(endPoint)
 				default:
-					err = errors.New(fmt.Sprintf("unknown container runtime %s", runtime))
+					err = fmt.Errorf("unknown container runtime %s", runtime)
 				}
 				if err != nil {
 					logrus.Debugf(err.Error())
@@ -220,7 +220,7 @@ func AutoDetectRuntime() (string, string, error) {
 }
 
 func isDockerRunning(host string) (bool, error) {
-	dockerCli, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.WithHost(host), client.WithTimeout(constants.Timeout))
+	dockerCli, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.WithHost(host), client.WithTimeout(utils.Timeout))
 	if err != nil {
 		return false, errors.Wrapf(err, " :error creating docker client")
 	}
@@ -281,11 +281,11 @@ func NewRuntime() (Runtime, error) {
 		return nil, err
 	}
 
-	if runtime == constants.DOCKER {
+	if runtime == utils.DOCKER {
 		return docker.New(), nil
-	} else if runtime == constants.CONTAINERD {
+	} else if runtime == utils.CONTAINERD {
 		return self_containerd.New(endpoint), nil
-	} else if runtime == constants.CRIO {
+	} else if runtime == utils.CRIO {
 		return crio.New(endpoint), nil
 	}
 

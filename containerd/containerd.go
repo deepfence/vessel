@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/deepfence/vessel/constants"
+	"github.com/deepfence/vessel/utils"
 	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd"
@@ -149,7 +149,7 @@ func migrateOCIToDockerV1(path, imageID, tarFilePath string) error {
 
 // fileuploader specific
 func MigrateOCITarToDockerV1Tar(dir, tarName string) error {
-	fmt.Println("migrating image ...")
+	logrus.Info("migrating image ...")
 	var stderr bytes.Buffer
 	tarPath := path.Join(dir, tarName)
 	_, err := exec.Command("tar", "xf", tarPath, "--warning=none", "-C"+dir).Output()
@@ -182,9 +182,9 @@ func MigrateOCITarToDockerV1Tar(dir, tarName string) error {
 }
 
 // ExtractFileSystem Extract the file system from tar of an image by creating a temporary dormant container instance
-func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string, socketPath string) error {
+func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string) error {
 	// create a new client connected to the default socket path for containerd
-	client, err := containerdApi.New(strings.Replace(socketPath, "unix://", "", 1))
+	client, err := containerdApi.New(strings.Replace(c.socketPath, "unix://", "", 1))
 	if err != nil {
 		return err
 	}
@@ -193,30 +193,30 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	ctx := namespaces.WithNamespace(context.Background(), "temp")
 	reader, err := os.Open(imageTarPath)
 	if err != nil {
-		fmt.Println("Error while opening image")
+		logrus.Error("Error while opening image")
 		return err
 	}
 	imgs, err := client.Import(ctx, reader,
 		containerdApi.WithSkipDigestRef(func(name string) bool { return name != "" }),
 		containerdApi.WithDigestRef(archive.DigestTranslator(imageName)))
 	if err != nil {
-		fmt.Println("Error while Importing image")
+		logrus.Error("Error while Importing image")
 		return err
 	}
 	if len(imgs) == 0 {
-		fmt.Printf("No images imported, imageTarPath: %s, outputTarPath: %s, imageName: %s \n", imageTarPath, outputTarPath, imageName)
+		logrus.Errorf("No images imported, imageTarPath: %s, outputTarPath: %s, imageName: %s \n", imageTarPath, outputTarPath, imageName)
 		return errors.New("image not imported from: " + imageTarPath)
 	}
 	image, err := client.GetImage(ctx, imgs[0].Name)
 	if err != nil {
-		fmt.Println("Error while getting image from client")
+		logrus.Error("Error while getting image from client")
 		return err
 	}
 	rand.Seed(time.Now().UnixNano())
 	containerName := "temp" + fmt.Sprint(rand.Intn(9999))
 	err = image.Unpack(ctx, "")
 	if err != nil {
-		fmt.Println("Error while unpacking image")
+		logrus.Error("Error while unpacking image")
 		return err
 	}
 	container, err := client.NewContainer(
@@ -227,7 +227,7 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 		containerdApi.WithNewSpec(oci.WithImageConfig(image)),
 	)
 	if err != nil {
-		fmt.Println("Error while creating container")
+		logrus.Error("Error while creating container")
 		return err
 	}
 	info, _ := container.Info(ctx)
@@ -236,42 +236,46 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerName
 	_, err = exec.Command("mkdir", target).Output()
 	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
-		fmt.Println("Error while creating temp target dir", target, err.Error())
+		logrus.Errorf("Error while creating temp target dir %s: %s", target, err.Error())
 		return err
 	}
+	defer func() {
+		exec.Command("umount", target).Output()
+		exec.Command("rm", "-rf", target).Output()
+	}()
 	_, err = exec.Command("bash", "-c", fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))).Output()
 	if err != nil {
-		fmt.Println("Error while mounting image on temp target dir")
+		logrus.Error("Error while mounting image on temp target dir")
 		return err
 	}
 	_, err = exec.Command("tar", "-czvf", outputTarPath, "-C", target, ".").Output()
-	if err != nil {
-		fmt.Println("Error while packing tar")
-		return err
+	if !utils.CheckTarFileValid(outputTarPath) {
+		if err != nil {
+			logrus.Error("Error while packing tar")
+			return err
+		}
 	}
-	exec.Command("umount", target).Output()
-	exec.Command("rm", "-rf", target).Output()
 	container.Delete(ctx, containerdApi.WithSnapshotCleanup)
 	client.ImageService().Delete(ctx, imgs[0].Name, images.SynchronousDelete())
 	return nil
 }
 
 // ExtractFileSystemContainer Extract the file system of an existing container to tar
-func (c Containerd) ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string, socketPath string) error {
+func (c Containerd) ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string) error {
 	// create a new client connected to the default socket path for containerd
-	client, err := containerdApi.New(strings.Replace(socketPath, "unix://", "", 1))
+	client, err := containerdApi.New(strings.Replace(c.socketPath, "unix://", "", 1))
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 	// create a new context with namespace
 	if len(namespace) == 0 {
-		namespace = constants.CONTAINERD_K8S_NS
+		namespace = utils.CONTAINERD_K8S_NS
 	}
 	ctx := namespaces.WithNamespace(context.Background(), namespace)
 	container, err := client.LoadContainer(ctx, containerId)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error while getting container")
+		logrus.Error("Error while getting container")
 		return err
 	}
 	info, _ := container.Info(ctx)
@@ -280,17 +284,21 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerId
 	_, err = exec.Command("mkdir", target).Output()
 	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
-		fmt.Fprintf(os.Stderr, "Error while creating temp target dir %s %s \n", target, err.Error())
+		logrus.Errorf("Error while creating temp target dir %s %s \n", target, err.Error())
 		return err
 	}
+	defer func() {
+		exec.Command("umount", target).Output()
+		exec.Command("rm", "-rf", target).Output()
+	}()
 	var mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
 	cmd := exec.Command("bash", "-c", mountStatement)
 	logrus.Infof("mount command: %s", cmd.String())
 	_, err = cmd.Output()
 	if err != nil {
 		mountedHostPath := "/fenced/mnt/host"
-		fmt.Fprintf(os.Stderr, "error while mounting image on temp target dir %s %s %s \n", mountStatement, " err: ", err.Error())
-		fmt.Fprintf(os.Stderr, "Reattempting mount from %s \n", mountedHostPath)
+		logrus.Errorf("error while mounting image on temp target dir %s %s %s \n", mountStatement, " err: ", err.Error())
+		logrus.Errorf("Reattempting mount from %s \n", mountedHostPath)
 		var containerdTmpDirs = []string{"/tmp", "/var/lib"}
 		var workDir, upperDir, lowerDir string
 		for index, option := range mounts[0].Options {
@@ -313,16 +321,17 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		logrus.Infof("mount command: %s", cmd.String())
 		_, err := cmd.Output()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error while mounting image on temp target dir 2nd attempt %s %s %s \n", mountStatement, " err: ", err.Error())
+			logrus.Errorf("error while mounting image on temp target dir 2nd attempt %s %s %s \n", mountStatement, " err: ", err.Error())
 			return err
 		}
-		fmt.Fprintf(os.Stderr, "mount success \n")
+		logrus.Error("mount success \n")
 	}
 	_, err = exec.Command("tar", "-czvf", outputTarPath, "-C", target, ".").Output()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error while packing tar %s %s %s \n", outputTarPath, target, err.Error())
-		return err
+	if !utils.CheckTarFileValid(outputTarPath) {
+		if err != nil {
+			logrus.Errorf("Error while packing tar %s %s %s \n", outputTarPath, target, err.Error())
+			return err
+		}
 	}
-	exec.Command("umount", target).Output()
 	return nil
 }

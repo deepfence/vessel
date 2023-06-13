@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/deepfence/vessel/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -43,15 +44,13 @@ func (c CRIO) Save(imageName, outputParam string) ([]byte, error) {
 	return cmd.Output()
 }
 
-func (c CRIO) ExtractFileSystem(imageTarPath string, outputTarPath string,
-	imageName string, socketPath string) error {
+func (c CRIO) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string) error {
 	return errors.New("function not implemented for cri-o")
 }
 
-func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string,
-	outputTarPath string, socketPath string) error {
+func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string) error {
 
-	// inspect doesnot accept runtime endpoint option
+	// inspect does not accept runtime endpoint option
 	_, _ = exec.Command(
 		"crictl",
 		"config",
@@ -79,10 +78,13 @@ func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string,
 
 	cmd = exec.Command("tar", "-czvf", outputTarPath, "-C", cleanrootpath, ".")
 	logrus.Infof("tar command: %s", cmd.String())
-	if _, err := cmd.Output(); err != nil {
-		logrus.Errorf("error while packing tar containerId: %s file: %s path: %s error: %s",
-			containerId, outputTarPath, rootpath, err)
-		return err
+	_, err = cmd.Output()
+	if !utils.CheckTarFileValid(outputTarPath) {
+		if err != nil {
+			logrus.Errorf("error while packing tar containerId: %s file: %s path: %s error: %s",
+				containerId, outputTarPath, rootpath, err)
+			return err
+		}
 	}
 
 	return nil
