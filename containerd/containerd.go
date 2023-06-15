@@ -297,8 +297,8 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	_, err = cmd.Output()
 	if err != nil {
 		mountedHostPath := "/fenced/mnt/host"
-		logrus.Errorf("error while mounting image on temp target dir %s %s %s \n", mountStatement, " err: ", err.Error())
-		logrus.Errorf("Reattempting mount from %s \n", mountedHostPath)
+		logrus.Warnf("error while mounting image on temp target dir %s %s %s \n", mountStatement, " err: ", err.Error())
+		logrus.Infof("Reattempting mount from %s \n", mountedHostPath)
 		var containerdTmpDirs = []string{"/tmp", "/var/lib"}
 		var workDir, upperDir, lowerDir string
 		for index, option := range mounts[0].Options {
@@ -319,12 +319,12 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 			mounts[0].Type, mounts[0].Source, target, workDir+":"+upperDir+":"+lowerDir)
 		cmd := exec.Command("bash", "-c", mountStatement)
 		logrus.Infof("mount command: %s", cmd.String())
-		_, err := cmd.Output()
+		_, err = cmd.Output()
 		if err != nil {
 			logrus.Errorf("error while mounting image on temp target dir 2nd attempt %s %s %s \n", mountStatement, " err: ", err.Error())
 			return err
 		}
-		logrus.Error("mount success \n")
+		logrus.Info("mount success \n")
 	}
 	_, err = exec.Command("tar", "-czvf", outputTarPath, "-C", target, ".").Output()
 	if !utils.CheckTarFileValid(outputTarPath) {
