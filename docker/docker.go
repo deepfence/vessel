@@ -109,7 +109,7 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 // ExtractFileSystemContainer Extract the file system of an existing container to tar
 func (d Docker) ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string) error {
 	cmd := exec.Command("docker", "export", strings.TrimSpace(containerId), "-o", outputTarPath)
-	_, err := runCommand(cmd, "docker export: "+string(containerId))
+	_, err := runCommand(cmd, "docker export: "+string(containerId)+" .The container may not exist. Please wait for the container to sync. Please contact support if the issue persists. ")
 	if err != nil {
 		return err
 	}
