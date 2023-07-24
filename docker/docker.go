@@ -132,7 +132,7 @@ func runCommand(cmd *exec.Cmd, operation string) (*bytes.Buffer, error) {
 	if errorOnRun != nil {
 		logrus.Errorf("cmd: %s", cmd.String())
 		logrus.Error(errorOnRun)
-		return nil, errors.New(operation + fmt.Sprint(errorOnRun) + ": " + stderr.String())
+		return nil, errors.New(operation + fmt.Sprint(errorOnRun) + ": " + stderr.String() + ". The container may not exist. Please wait for the container to sync. Please contact support if the issue persists.")
 	}
 	return &out, nil
 }
