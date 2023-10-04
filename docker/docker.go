@@ -4,17 +4,17 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"fmt"
 	"os/exec"
 	"strings"
 
+	"github.com/deepfence/vessel/utils"
 	"github.com/sirupsen/logrus"
 )
 
 // New instantiates a new Docker runtime object
-func New() *Docker {
+func New(endpoint string) *Docker {
 	return &Docker{
-		socketPath: "unix:///var/run/docker.sock",
+		socketPath: endpoint,
 	}
 }
 
@@ -67,7 +67,7 @@ func (d Docker) Save(imageName, outputParam string) ([]byte, error) {
 
 // ExtractFileSystem Extract the file system from tar of an image by creating a temporary dormant container instance
 func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string) error {
-	imageMsg, err := runCommand(exec.Command("docker", "load", "-i", imageTarPath), "docker load: "+imageTarPath)
+	imageMsg, err := utils.RunCommand(exec.Command("docker", "load", "-i", imageTarPath), "docker load: "+imageTarPath)
 	if err != nil {
 		return err
 	}
@@ -86,20 +86,20 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 	if imageId == "" {
 		return errors.New("image not found from docker load with output: " + string(imageMsg.Bytes()))
 	}
-	containerOutput, err := runCommand(exec.Command("docker", "create", imageId), "docker create: "+imageId)
+	containerOutput, err := utils.RunCommand(exec.Command("docker", "create", imageId), "docker create: "+imageId)
 	if err != nil {
 		return err
 	}
 	containerId := strings.TrimSpace(containerOutput.String())
-	_, err = runCommand(exec.Command("docker", "export", strings.TrimSpace(containerId), "-o", outputTarPath), "docker export: "+string(containerId))
+	_, err = utils.RunCommand(exec.Command("docker", "export", strings.TrimSpace(containerId), "-o", outputTarPath), "docker export: "+string(containerId))
 	if err != nil {
 		return err
 	}
-	_, err = runCommand(exec.Command("docker", "container", "rm", containerId), "delete container:"+containerId)
+	_, err = utils.RunCommand(exec.Command("docker", "container", "rm", containerId), "delete container:"+containerId)
 	if err != nil {
 		logrus.Warn(err.Error())
 	}
-	_, err = runCommand(exec.Command("docker", "image", "rm", imageId), "delete image:"+imageId)
+	_, err = utils.RunCommand(exec.Command("docker", "image", "rm", imageId), "delete image:"+imageId)
 	if err != nil {
 		logrus.Warn(err.Error())
 	}
@@ -109,7 +109,7 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 // ExtractFileSystemContainer Extract the file system of an existing container to tar
 func (d Docker) ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string) error {
 	cmd := exec.Command("docker", "export", strings.TrimSpace(containerId), "-o", outputTarPath)
-	_, err := runCommand(cmd, "docker export: "+string(containerId))
+	_, err := utils.RunCommand(cmd, "docker export: "+string(containerId))
 	if err != nil {
 		return err
 	}
@@ -119,20 +119,4 @@ func (d Docker) ExtractFileSystemContainer(containerId string, namespace string,
 // ExtractFileSystemContainer Extract the file system of an existing container to tar
 func (d Docker) GetFileSystemPathsForContainer(containerId string, namespace string) ([]byte, error) {
 	return exec.Command("docker", "inspect", strings.TrimSpace(containerId), "|", "jq", "-r", "'map([.Name, .GraphDriver.Data.MergedDir]) | .[] | \"\\(.[0])\t\\(.[1])\"'").Output()
-}
-
-// operation is prepended to error message in case of error: optional
-func runCommand(cmd *exec.Cmd, operation string) (*bytes.Buffer, error) {
-
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	errorOnRun := cmd.Run()
-	if errorOnRun != nil {
-		logrus.Errorf("cmd: %s", cmd.String())
-		logrus.Error(errorOnRun)
-		return nil, errors.New(operation + fmt.Sprint(errorOnRun) + ": " + stderr.String())
-	}
-	return &out, nil
 }
