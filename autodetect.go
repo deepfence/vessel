@@ -251,7 +251,7 @@ func isDockerRunning(host string) (bool, error) {
 }
 
 func isPodmanRunning(host string) (bool, error) {
-	op, err := utils.RunCommand(exec.Command("podman", "--url", host, "ps"), "podman ps:")
+	op, err := utils.RunCommand(exec.Command("podman", "--remote", "--url", host, "ps"), "podman ps:")
 	if err != nil {
 		logrus.Warn(err.Error())
 		return false, err
