@@ -11,9 +11,10 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
-	self_containerd "github.com/deepfence/vessel/containerd"
+	selfContainerd "github.com/deepfence/vessel/containerd"
 	"github.com/deepfence/vessel/crio"
 	"github.com/deepfence/vessel/docker"
+	selfPodman "github.com/deepfence/vessel/podman"
 	"github.com/deepfence/vessel/utils"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -99,6 +100,18 @@ func checkDockerRuntime(endPoint string) (bool, error) {
 	return true, nil
 }
 
+func checkPodmanRuntime(endPoint string) (bool, error) {
+	running, err := isPodmanRunning(endPoint)
+	if err != nil {
+		return false, err
+	}
+	if !running {
+		logrus.Debugf("no running containers found with endpoint %s", endPoint)
+		return false, nil
+	}
+	return true, nil
+}
+
 func checkContainerdRuntime(endPoint string) (bool, error) {
 	addr, dialer, err := GetAddressAndDialer(endPoint)
 	if err != nil {
@@ -168,6 +181,8 @@ func getContainerRuntime() (string, string, error) {
 					connected, err = checkContainerdRuntime(endPoint)
 				case utils.CRIO:
 					connected, err = checkCrioRuntime(endPoint)
+				case utils.PODMAN:
+					connected, err = checkPodmanRuntime(endPoint)
 				default:
 					err = fmt.Errorf("unknown container runtime %s", runtime)
 				}
@@ -235,6 +250,15 @@ func isDockerRunning(host string) (bool, error) {
 	return len(containers) > 0, nil
 }
 
+func isPodmanRunning(host string) (bool, error) {
+	op, err := utils.RunCommand(exec.Command("podman", "--remote", "--url", host, "ps"), "podman ps:")
+	if err != nil {
+		logrus.Warn(err.Error())
+		return false, err
+	}
+	return len(strings.Split(strings.TrimSpace(op.String()), "\n")) > 1, nil
+}
+
 func isContainerdRunning(host string) (bool, error) {
 	clientd, err := containerd.New(strings.Replace(host, "unix://", "", 1))
 	if err != nil {
@@ -282,11 +306,13 @@ func NewRuntime() (Runtime, error) {
 	}
 
 	if runtime == utils.DOCKER {
-		return docker.New(), nil
+		return docker.New(endpoint), nil
 	} else if runtime == utils.CONTAINERD {
-		return self_containerd.New(endpoint), nil
+		return selfContainerd.New(endpoint), nil
 	} else if runtime == utils.CRIO {
 		return crio.New(endpoint), nil
+	} else if runtime == utils.PODMAN {
+		return selfPodman.New(endpoint), nil
 	}
 
 	return nil, errors.New("Unknown runtime")
