@@ -8,6 +8,7 @@ builds:
       - linux
     goarch:
       - amd64
+      - arm64
     main: ./cmd/vessel/main.go
 checksum:
   name_template: 'checksums.txt'
