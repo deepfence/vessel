@@ -15,7 +15,6 @@ import (
 	"github.com/deepfence/vessel/utils"
 	"github.com/sirupsen/logrus"
 
-	"github.com/containerd/containerd"
 	containerdApi "github.com/containerd/containerd"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/archive"
@@ -32,7 +31,7 @@ func New(host string) *Containerd {
 }
 
 func getNamespaces(host string) []string {
-	clientd, err := containerd.New(strings.Replace(host, "unix://", "", 1))
+	clientd, err := containerdApi.New(strings.Replace(host, "unix://", "", 1))
 	if err != nil {
 		return nil
 	}
@@ -233,6 +232,9 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	info, _ := container.Info(ctx)
 	snapshotter := client.SnapshotService(info.Snapshotter)
 	mounts, err := snapshotter.Mounts(ctx, info.SnapshotKey)
+	if err != nil {
+		logrus.Errorf("Error mount snapshot %s: %s", info.SnapshotKey, err.Error())
+	}
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerName
 	_, err = exec.Command("mkdir", target).Output()
 	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
@@ -281,6 +283,9 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	info, _ := container.Info(ctx)
 	snapshotter := client.SnapshotService(info.Snapshotter)
 	mounts, err := snapshotter.Mounts(ctx, info.SnapshotKey)
+	if err != nil {
+		logrus.Errorf("Error mount snapshot %s: %s", info.SnapshotKey, err.Error())
+	}
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerId
 	_, err = exec.Command("mkdir", target).Output()
 	if err != nil && !strings.Contains(err.Error(), "exit status 1") {

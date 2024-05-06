@@ -16,7 +16,7 @@ import (
 	"github.com/deepfence/vessel/docker"
 	selfPodman "github.com/deepfence/vessel/podman"
 	"github.com/deepfence/vessel/utils"
-	"github.com/docker/docker/api/types"
+	containerTypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -240,9 +240,10 @@ func isDockerRunning(host string) (bool, error) {
 		return false, errors.Wrapf(err, " :error creating docker client")
 	}
 	defer dockerCli.Close()
-	containers, err := dockerCli.ContainerList(context.Background(), types.ContainerListOptions{
-		All: true, Size: false,
-	})
+	containers, err := dockerCli.ContainerList(context.Background(),
+		containerTypes.ListOptions{
+			All: true, Size: false,
+		})
 	if err != nil {
 		return false, errors.Wrapf(err, " :error creating docker client")
 	}
@@ -268,6 +269,9 @@ func isContainerdRunning(host string) (bool, error) {
 	namespace_store := clientd.NamespaceService()
 
 	list, err := namespace_store.List(context.Background())
+	if err != nil {
+		return false, errors.Wrapf(err, " :error creating containerd client")
+	}
 	for _, l := range list {
 
 		namespace := namespaces.WithNamespace(context.Background(), l)

@@ -84,7 +84,7 @@ func (d Docker) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 		}
 	}
 	if imageId == "" {
-		return errors.New("image not found from docker load with output: " + string(imageMsg.Bytes()))
+		return errors.New("image not found from docker load with output: " + imageMsg.String())
 	}
 	containerOutput, err := utils.RunCommand(exec.Command("docker", "create", imageId), "docker create: "+imageId)
 	if err != nil {

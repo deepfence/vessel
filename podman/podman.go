@@ -84,7 +84,7 @@ func (d Podman) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 		}
 	}
 	if imageId == "" {
-		return errors.New("image not found from podman load with output: " + string(imageMsg.Bytes()))
+		return errors.New("image not found from podman load with output: " + imageMsg.String())
 	}
 	containerOutput, err := utils.RunCommand(exec.Command("podman", "--remote", "--url", d.socketPath, "create", imageId), "podman create: "+imageId)
 	if err != nil {
