@@ -23,6 +23,15 @@ func (d Docker) GetSocket() string {
 	return d.socketPath
 }
 
+// ImageExists checks if the image exists
+func (d Docker) ImageExists(imageName string) bool {
+	_, err := exec.Command("docker", "inspect", imageName).Output()
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 // ExtractImage creates the tarball out of image and extracts it
 func (d Docker) ExtractImage(imageID, imageName, path string) error {
 	var stderr bytes.Buffer
