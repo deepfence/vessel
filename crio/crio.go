@@ -76,7 +76,7 @@ func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string, o
 		return errors.New("container root path is empty")
 	}
 
-	cmd = exec.Command("tar", "-czvf", outputTarPath, "-C", cleanrootpath, ".")
+	cmd = exec.Command("tar", "-cvf", outputTarPath, "-C", cleanrootpath, ".")
 	logrus.Infof("tar command: %s", cmd.String())
 	_, err = cmd.Output()
 	if !utils.CheckTarFileValid(outputTarPath) {

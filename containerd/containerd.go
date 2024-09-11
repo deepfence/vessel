@@ -250,7 +250,7 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 		logrus.Error("Error while mounting image on temp target dir")
 		return err
 	}
-	_, err = exec.Command("tar", "-czvf", outputTarPath, "-C", target, ".").Output()
+	_, err = exec.Command("tar", "-cvf", outputTarPath, "-C", target, ".").Output()
 	if !utils.CheckTarFileValid(outputTarPath) {
 		if err != nil {
 			logrus.Error("Error while packing tar")
@@ -331,7 +331,7 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		}
 		logrus.Info("mount success \n")
 	}
-	_, err = exec.Command("tar", "-czvf", outputTarPath, "-C", target, ".").Output()
+	_, err = exec.Command("tar", "-cvf", outputTarPath, "-C", target, ".").Output()
 	if !utils.CheckTarFileValid(outputTarPath) {
 		if err != nil {
 			logrus.Errorf("Error while packing tar %s %s %s \n", outputTarPath, target, err.Error())
