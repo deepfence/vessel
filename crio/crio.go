@@ -20,6 +20,15 @@ func (c CRIO) GetSocket() string {
 	return c.socketPath
 }
 
+// ImageExists checks if the image exists
+func (c CRIO) ImageExists(imageName string) bool {
+	_, err := exec.Command("podman", "inspect", imageName).Output()
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 func (c CRIO) ExtractImage(imageID, imageName, path string) error {
 	cmd := exec.Command("podman", "save", "--events-backend", "file",
 		"--format", "docker-dir", "--output", path, imageName)

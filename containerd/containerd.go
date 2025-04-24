@@ -50,6 +50,15 @@ func (c Containerd) GetSocket() string {
 	return c.socketPath
 }
 
+// ImageExists checks if the image exists
+func (c Containerd) ImageExists(imageName string) bool {
+	_, err := exec.Command("nerdctl", "inspect", imageName, "--address", c.socketPath).Output()
+	if err != nil {
+		return false
+	}
+	return true
+}
+
 // ExtractImage will create the tarball from the containerd image, extracts into dir
 // and then skopeo is used to migrate oci layers using the dir to docker v1 layer spec format tar
 // and again extracts back to dir

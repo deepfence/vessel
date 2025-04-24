@@ -8,4 +8,5 @@ type Runtime interface {
 	GetSocket() string
 	ExtractFileSystem(imageTarPath string, outputTarPath string, imageName string) error
 	ExtractFileSystemContainer(containerId string, namespace string, outputTarPath string) error
+	ImageExists(imageName string) bool
 }
