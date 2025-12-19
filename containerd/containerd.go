@@ -13,13 +13,13 @@ import (
 	"time"
 
 	"github.com/deepfence/vessel/utils"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 
-	containerdApi "github.com/containerd/containerd"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/images/archive"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/oci"
+	containerdApi "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/images/archive"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
 // New instantiates a new Containerd runtime object
@@ -157,7 +157,7 @@ func migrateOCIToDockerV1(path, imageID, tarFilePath string) error {
 
 // fileuploader specific
 func MigrateOCITarToDockerV1Tar(dir, tarName string) error {
-	logrus.Info("migrating image ...")
+	log.Info().Msg("migrating image ...")
 	var stderr bytes.Buffer
 	tarPath := path.Join(dir, tarName)
 	_, err := exec.Command("tar", "xf", tarPath, "--warning=none", "-C"+dir).Output()
@@ -201,53 +201,53 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	ctx := namespaces.WithNamespace(context.Background(), "temp")
 	reader, err := os.Open(imageTarPath)
 	if err != nil {
-		logrus.Error("Error while opening image")
+		log.Error().Msg("Error while opening image")
 		return err
 	}
 	imgs, err := client.Import(ctx, reader,
 		containerdApi.WithSkipDigestRef(func(name string) bool { return name != "" }),
 		containerdApi.WithDigestRef(archive.DigestTranslator(imageName)))
 	if err != nil {
-		logrus.Error("Error while Importing image")
+		log.Error().Msg("Error while Importing image")
 		return err
 	}
 	if len(imgs) == 0 {
-		logrus.Errorf("No images imported, imageTarPath: %s, outputTarPath: %s, imageName: %s \n", imageTarPath, outputTarPath, imageName)
+		log.Error().Msgf("No images imported, imageTarPath: %s, outputTarPath: %s, imageName: %s \n", imageTarPath, outputTarPath, imageName)
 		return errors.New("image not imported from: " + imageTarPath)
 	}
 	image, err := client.GetImage(ctx, imgs[0].Name)
 	if err != nil {
-		logrus.Error("Error while getting image from client")
+		log.Error().Msg("Error while getting image from client")
 		return err
 	}
-	rand.Seed(time.Now().UnixNano())
-	containerName := "temp" + fmt.Sprint(rand.Intn(9999))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	containerName := "temp" + fmt.Sprint(rng.Intn(9999))
 	err = image.Unpack(ctx, "")
 	if err != nil {
-		logrus.Error("Error while unpacking image")
+		log.Error().Msg("Error while unpacking image")
 		return err
 	}
 	container, err := client.NewContainer(
 		ctx,
 		containerName,
 		containerdApi.WithImage(image),
-		containerdApi.WithNewSnapshot("temp"+fmt.Sprint(rand.Intn(9999)), image),
+		containerdApi.WithNewSnapshot("temp"+fmt.Sprint(rng.Intn(9999)), image),
 		containerdApi.WithNewSpec(oci.WithImageConfig(image)),
 	)
 	if err != nil {
-		logrus.Error("Error while creating container")
+		log.Error().Msg("Error while creating container")
 		return err
 	}
 	info, _ := container.Info(ctx)
 	snapshotter := client.SnapshotService(info.Snapshotter)
 	mounts, err := snapshotter.Mounts(ctx, info.SnapshotKey)
 	if err != nil {
-		logrus.Errorf("Error mount snapshot %s: %s", info.SnapshotKey, err.Error())
+		log.Error().Msgf("Error mount snapshot %s: %s", info.SnapshotKey, err.Error())
 	}
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerName
 	_, err = exec.Command("mkdir", target).Output()
 	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
-		logrus.Errorf("Error while creating temp target dir %s: %s", target, err.Error())
+		log.Error().Msgf("Error while creating temp target dir %s: %s", target, err.Error())
 		return err
 	}
 	defer func() {
@@ -256,13 +256,13 @@ func (c Containerd) ExtractFileSystem(imageTarPath string, outputTarPath string,
 	}()
 	_, err = exec.Command("bash", "-c", fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))).Output()
 	if err != nil {
-		logrus.Error("Error while mounting image on temp target dir")
+		log.Error().Msg("Error while mounting image on temp target dir")
 		return err
 	}
 	_, err = exec.Command("tar", "-cvf", outputTarPath, "-C", target, ".").Output()
 	if !utils.CheckTarFileValid(outputTarPath) {
 		if err != nil {
-			logrus.Error("Error while packing tar")
+			log.Error().Msg("Error while packing tar")
 			return err
 		}
 	}
@@ -286,19 +286,19 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	ctx := namespaces.WithNamespace(context.Background(), namespace)
 	container, err := client.LoadContainer(ctx, containerId)
 	if err != nil {
-		logrus.Error("Error while getting container")
+		log.Error().Msg("Error while getting container")
 		return err
 	}
 	info, _ := container.Info(ctx)
 	snapshotter := client.SnapshotService(info.Snapshotter)
 	mounts, err := snapshotter.Mounts(ctx, info.SnapshotKey)
 	if err != nil {
-		logrus.Errorf("Error mount snapshot %s: %s", info.SnapshotKey, err.Error())
+		log.Error().Msgf("Error mount snapshot %s: %s", info.SnapshotKey, err.Error())
 	}
 	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerId
 	_, err = exec.Command("mkdir", target).Output()
 	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
-		logrus.Errorf("Error while creating temp target dir %s %s \n", target, err.Error())
+		log.Error().Msgf("Error while creating temp target dir %s %s \n", target, err.Error())
 		return err
 	}
 	defer func() {
@@ -307,12 +307,12 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 	}()
 	var mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
 	cmd := exec.Command("bash", "-c", mountStatement)
-	logrus.Infof("mount command: %s", cmd.String())
+	log.Info().Msgf("mount command: %s", cmd.String())
 	_, err = cmd.Output()
 	if err != nil {
 		mountedHostPath := "/fenced/mnt/host"
-		logrus.Warnf("error while mounting image on temp target dir %s %s %s \n", mountStatement, " err: ", err.Error())
-		logrus.Infof("Reattempting mount from %s \n", mountedHostPath)
+		log.Warn().Msgf("error while mounting image on temp target dir %s %s %s \n", mountStatement, " err: ", err.Error())
+		log.Info().Msgf("Reattempting mount from %s \n", mountedHostPath)
 		var containerdTmpDirs = []string{"/tmp", "/var/lib"}
 		var workDir, upperDir, lowerDir string
 		for index, option := range mounts[0].Options {
@@ -332,18 +332,18 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		mountStatement = fmt.Sprintf("mount -t %s %s %s -o index=off,lowerdir=%s \n",
 			mounts[0].Type, mounts[0].Source, target, workDir+":"+upperDir+":"+lowerDir)
 		cmd := exec.Command("bash", "-c", mountStatement)
-		logrus.Infof("mount command: %s", cmd.String())
+		log.Info().Msgf("mount command: %s", cmd.String())
 		_, err = cmd.Output()
 		if err != nil {
-			logrus.Errorf("error while mounting image on temp target dir 2nd attempt %s %s %s \n", mountStatement, " err: ", err.Error())
+			log.Error().Msgf("error while mounting image on temp target dir 2nd attempt %s %s %s \n", mountStatement, " err: ", err.Error())
 			return err
 		}
-		logrus.Info("mount success \n")
+		log.Info().Msg("mount success \n")
 	}
 	_, err = exec.Command("tar", "-cvf", outputTarPath, "-C", target, ".").Output()
 	if !utils.CheckTarFileValid(outputTarPath) {
 		if err != nil {
-			logrus.Errorf("Error while packing tar %s %s %s \n", outputTarPath, target, err.Error())
+			log.Error().Msgf("Error while packing tar %s %s %s \n", outputTarPath, target, err.Error())
 			return err
 		}
 	}

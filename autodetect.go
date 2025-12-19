@@ -9,26 +9,24 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	selfContainerd "github.com/deepfence/vessel/containerd"
 	"github.com/deepfence/vessel/crio"
 	"github.com/deepfence/vessel/docker"
 	selfPodman "github.com/deepfence/vessel/podman"
 	"github.com/deepfence/vessel/utils"
-	containerTypes "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
+	"github.com/docker/docker/api/types/container"
+	dockerClient "github.com/docker/docker/client"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 func init() {
-	customFormatter := new(logrus.TextFormatter)
-	customFormatter.TimestampFormat = "2006-01-02 15:04:05"
-	logrus.SetFormatter(customFormatter)
-	customFormatter.FullTimestamp = true
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 }
 
 // GetAddressAndDialer returns the address parsed from the given endpoint and a context dialer.
@@ -53,7 +51,7 @@ func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string)
 		fallbackEndpoint := fallbackProtocol + "://" + endpoint
 		protocol, addr, err = parseEndpoint(fallbackEndpoint)
 		if err == nil {
-			logrus.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
+			log.Warn().Msgf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
 		}
 	}
 	return
@@ -94,7 +92,7 @@ func checkDockerRuntime(endPoint string) (bool, error) {
 		return false, err
 	}
 	if !running {
-		logrus.Debugf("no running containers found with endpoint %s", endPoint)
+		log.Debug().Msgf("no running containers found with endpoint %s", endPoint)
 		return false, nil
 	}
 	return true, nil
@@ -106,7 +104,7 @@ func checkPodmanRuntime(endPoint string) (bool, error) {
 		return false, err
 	}
 	if !running {
-		logrus.Debugf("no running containers found with endpoint %s", endPoint)
+		log.Debug().Msgf("no running containers found with endpoint %s", endPoint)
 		return false, nil
 	}
 	return true, nil
@@ -128,7 +126,7 @@ func checkContainerdRuntime(endPoint string) (bool, error) {
 		return false, err
 	}
 	if !running {
-		logrus.Debugf("no running containers found with endpoint %s", endPoint)
+		log.Debug().Msgf("no running containers found with endpoint %s", endPoint)
 		return false, nil
 	}
 	return true, nil
@@ -148,7 +146,7 @@ func checkCrioRuntime(endPoint string) (bool, error) {
 		return false, err
 	}
 	if !running {
-		logrus.Debugf("no running containers found with endpoint %s", endPoint)
+		log.Debug().Msgf("no running containers found with endpoint %s", endPoint)
 		return false, nil
 	}
 	return true, nil
@@ -171,7 +169,7 @@ func getContainerRuntime() (string, string, error) {
 		for _, endPoint := range endPoints {
 			wg.Add(1)
 			go func(runtime, endPoint string) {
-				logrus.Debugf("trying to connect to endpoint '%s' with timeout '%s'", endPoint, utils.Timeout)
+				log.Debug().Msgf("trying to connect to endpoint '%s' with timeout '%s'", endPoint, utils.Timeout)
 				var connected bool
 				var err error
 				switch runtime {
@@ -187,13 +185,13 @@ func getContainerRuntime() (string, string, error) {
 					err = fmt.Errorf("unknown container runtime %s", runtime)
 				}
 				if err != nil {
-					logrus.Debugf(err.Error())
+					log.Debug().Msg(err.Error())
 					wg.Done()
 					return
 				}
 				detectedRuntimeChannel <- containerRuntime{Runtime: runtime, Endpoint: endPoint, Connected: connected}
 				if connected {
-					logrus.Infof("connected successfully to endpoint: %s", endPoint)
+					log.Info().Msgf("connected successfully to endpoint: %s", endPoint)
 				}
 			}(runtime, endPoint)
 		}
@@ -214,7 +212,7 @@ func getContainerRuntime() (string, string, error) {
 		if len(detectedRuntimes) == 0 {
 			return "", "", nil
 		} else {
-			logrus.Infof("No running runtimes, selecting first detected runtime")
+			log.Info().Msg("No running runtimes, selecting first detected runtime")
 			return detectedRuntimes[0].Runtime, detectedRuntimes[0].Endpoint, nil
 		}
 	}
@@ -230,18 +228,18 @@ func AutoDetectRuntime() (string, string, error) {
 	if runtime == "" {
 		return "", "", errors.New("could not detect container runtime")
 	}
-	logrus.Infof("container runtime detected: %s\n", runtime)
+	log.Info().Msgf("container runtime detected: %s\n", runtime)
 	return runtime, endpoint, nil
 }
 
 func isDockerRunning(host string) (bool, error) {
-	dockerCli, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.WithHost(host), client.WithTimeout(utils.Timeout))
+	dockerCli, err := dockerClient.NewClientWithOpts(dockerClient.WithAPIVersionNegotiation(), dockerClient.WithHost(host), dockerClient.WithTimeout(utils.Timeout))
 	if err != nil {
 		return false, errors.Wrapf(err, " :error creating docker client")
 	}
 	defer dockerCli.Close()
 	containers, err := dockerCli.ContainerList(context.Background(),
-		containerTypes.ListOptions{
+		container.ListOptions{
 			All: true, Size: false,
 		})
 	if err != nil {
@@ -254,14 +252,14 @@ func isDockerRunning(host string) (bool, error) {
 func isPodmanRunning(host string) (bool, error) {
 	op, err := utils.RunCommand(exec.Command("podman", "--remote", "--url", host, "ps"), "podman ps:")
 	if err != nil {
-		logrus.Warn(err.Error())
+		log.Warn().Msg(err.Error())
 		return false, err
 	}
 	return len(strings.Split(strings.TrimSpace(op.String()), "\n")) > 1, nil
 }
 
 func isContainerdRunning(host string) (bool, error) {
-	clientd, err := containerd.New(strings.Replace(host, "unix://", "", 1))
+	clientd, err := client.New(strings.Replace(host, "unix://", "", 1))
 	if err != nil {
 		return false, errors.Wrapf(err, " :error creating containerd client")
 	}
@@ -292,10 +290,10 @@ func isContainerdRunning(host string) (bool, error) {
 
 func isCRIORunning(host string) (bool, error) {
 	cmd := exec.Command("crictl", "--runtime-endpoint", host, "ps", "-q")
-	logrus.Debugf("command: %s", cmd.String())
+	log.Debug().Msgf("command: %s", cmd.String())
 	output, err := cmd.Output()
 	if err != nil {
-		logrus.Errorf("%s, error: %s", output, err)
+		log.Error().Msgf("%s, error: %s", output, err)
 		return false, err
 	}
 	return true, nil

@@ -10,7 +10,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 func CheckTarGzFileValid(tarFilePath string) bool {
@@ -23,13 +23,14 @@ func CheckTarGzFileValid(tarFilePath string) bool {
 	if err != nil {
 		return false
 	}
+	defer gzipReader.Close()
 	tr := tar.NewReader(gzipReader)
 	_, err = tr.Next()
 	if err != nil {
 		if err == io.EOF {
 			return true
 		}
-		logrus.Error(err)
+		log.Error().Err(err).Msg("tar validation error")
 		return false
 	}
 	return true
@@ -47,7 +48,7 @@ func CheckTarFileValid(tarFilePath string) bool {
 		if err == io.EOF {
 			return true
 		}
-		logrus.Error(err)
+		log.Error().Err(err).Msg("tar validation error")
 		return false
 	}
 	return true
@@ -61,8 +62,8 @@ func RunCommand(cmd *exec.Cmd, operation string) (*bytes.Buffer, error) {
 	cmd.Stderr = &stderr
 	errorOnRun := cmd.Run()
 	if errorOnRun != nil {
-		logrus.Errorf("cmd: %s", cmd.String())
-		logrus.Error(errorOnRun)
+		log.Error().Msgf("cmd: %s", cmd.String())
+		log.Error().Err(errorOnRun).Msg("command execution failed")
 		return nil, errors.New(operation + fmt.Sprint(errorOnRun) + ": " + stderr.String())
 	}
 	return &out, nil
