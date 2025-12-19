@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/deepfence/vessel/utils"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 // New instantiates a new Podman runtime object
@@ -106,11 +106,11 @@ func (d Podman) ExtractFileSystem(imageTarPath string, outputTarPath string, ima
 	}
 	_, err = utils.RunCommand(exec.Command("podman", "--remote", "--url", d.socketPath, "container", "rm", containerId), "delete container:"+containerId)
 	if err != nil {
-		logrus.Warn(err.Error())
+		log.Warn().Msg(err.Error())
 	}
 	_, err = utils.RunCommand(exec.Command("podman", "--remote", "--url", d.socketPath, "image", "rm", imageId), "delete image:"+imageId)
 	if err != nil {
-		logrus.Warn(err.Error())
+		log.Warn().Msg(err.Error())
 	}
 	return nil
 }

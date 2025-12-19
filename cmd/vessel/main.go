@@ -5,7 +5,7 @@ import (
 
 	"github.com/deepfence/vessel"
 	"github.com/joho/godotenv"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 var activeRuntime string
@@ -16,13 +16,13 @@ func init() {
 	// Auto-detect underlying container runtime
 	activeRuntime, activeEndpoint, err = vessel.AutoDetectRuntime()
 	if err != nil {
-		logrus.Error(err)
+		log.Error().Err(err).Msg("failed to auto-detect runtime")
 		return
 	}
 	// create .env
 	_, err = os.Create(".env")
 	if err != nil {
-		logrus.Error(err)
+		log.Error().Err(err).Msg("failed to create .env file")
 		return
 	}
 }
@@ -46,7 +46,7 @@ func main() {
 		}
 		err := setDotEnvVariable(envVars)
 		if err != nil {
-			logrus.Error(err)
+			log.Error().Err(err).Msg("failed to set env variables")
 		}
 	}
 }
