@@ -289,22 +289,47 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		log.Error().Msg("Error while getting container")
 		return err
 	}
+
+	// 1. Try to read directly from running container's /proc/<pid>/root if task is active.
+	// This avoids OverlayFS exclusive in-use locks (I_OVL_INUSE) on Linux kernel >= 5.11 (e.g. 5.15).
+	task, taskErr := container.Task(ctx, nil)
+	if taskErr == nil && task.Pid() > 0 {
+		pid := task.Pid()
+		candidateRoots := []string{
+			fmt.Sprintf("/fenced/mnt/host/proc/%d/root", pid),
+			fmt.Sprintf("/proc/%d/root", pid),
+		}
+		for _, rootPath := range candidateRoots {
+			if fi, statErr := os.Stat(rootPath); statErr == nil && fi.IsDir() {
+				log.Info().Msgf("Extracting filesystem directly from container proc root: %s", rootPath)
+				cmd := exec.Command("tar", "-cvf", outputTarPath, "-C", rootPath, ".")
+				if _, tarErr := cmd.Output(); tarErr == nil && utils.CheckTarFileValid(outputTarPath) {
+					log.Info().Msgf("Successfully extracted container %s filesystem via proc root %s", containerId, rootPath)
+					return nil
+				}
+				log.Warn().Msgf("Failed tar extraction from %s, falling back to snapshot mount", rootPath)
+				break
+			}
+		}
+	}
+
 	info, _ := container.Info(ctx)
 	snapshotter := client.SnapshotService(info.Snapshotter)
 	mounts, err := snapshotter.Mounts(ctx, info.SnapshotKey)
 	if err != nil {
 		log.Error().Msgf("Error mount snapshot %s: %s", info.SnapshotKey, err.Error())
 	}
-	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerId
-	_, err = exec.Command("mkdir", target).Output()
-	if err != nil && !strings.Contains(err.Error(), "exit status 1") {
-		log.Error().Msgf("Error while creating temp target dir %s %s \n", target, err.Error())
-		return err
+	if len(mounts) == 0 {
+		return fmt.Errorf("no snapshot mounts found for snapshot %s", info.SnapshotKey)
 	}
+
+	target := strings.Replace(outputTarPath, ".tar", "", 1) + containerId
+	_ = os.MkdirAll(target, 0755)
 	defer func() {
 		exec.Command("umount", target).Output()
-		exec.Command("rm", "-rf", target).Output()
+		os.RemoveAll(target)
 	}()
+
 	var mountStatement = fmt.Sprintf("mount -t %s %s %s -o %s\n", mounts[0].Type, mounts[0].Source, target, strings.Join(mounts[0].Options, ","))
 	cmd := exec.Command("bash", "-c", mountStatement)
 	log.Info().Msgf("mount command: %s", cmd.String())
@@ -313,24 +338,13 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		mountedHostPath := "/fenced/mnt/host"
 		log.Warn().Msgf("error while mounting image on temp target dir %s %s %s \n", mountStatement, " err: ", err.Error())
 		log.Info().Msgf("Reattempting mount from %s \n", mountedHostPath)
-		var containerdTmpDirs = []string{"/tmp", "/var/lib"}
-		var workDir, upperDir, lowerDir string
-		for index, option := range mounts[0].Options {
-			for _, tmpDir := range containerdTmpDirs {
-				if strings.Contains(option, tmpDir) {
-					mounts[0].Options[index] = strings.Replace(option, tmpDir, mountedHostPath+tmpDir, -1)
-					if strings.Index(mounts[0].Options[index], "upperdir") >= 0 {
-						upperDir = strings.Split(mounts[0].Options[index], "=")[1]
-					} else if strings.Index(mounts[0].Options[index], "workdir") >= 0 {
-						workDir = strings.Split(mounts[0].Options[index], "=")[1]
-					} else if strings.Index(mounts[0].Options[index], "lowerdir") >= 0 {
-						lowerDir = strings.Split(mounts[0].Options[index], "=")[1]
-					}
-				}
-			}
+		mergedLower := SanitizeFallbackMountOptions(mounts[0].Options, mountedHostPath)
+		if mergedLower == "" {
+			return fmt.Errorf("unable to determine lower layers for container %s", containerId)
 		}
+
 		mountStatement = fmt.Sprintf("mount -t %s %s %s -o index=off,lowerdir=%s \n",
-			mounts[0].Type, mounts[0].Source, target, workDir+":"+upperDir+":"+lowerDir)
+			mounts[0].Type, mounts[0].Source, target, mergedLower)
 		cmd := exec.Command("bash", "-c", mountStatement)
 		log.Info().Msgf("mount command: %s", cmd.String())
 		_, err = cmd.Output()
@@ -348,4 +362,35 @@ func (c Containerd) ExtractFileSystemContainer(containerId string, namespace str
 		}
 	}
 	return nil
+}
+
+// SanitizeFallbackMountOptions extracts and remaps upperdir and lowerdir for read-only OverlayFS mounts.
+// Crucially, workdir is intentionally omitted because workdir is internal scratch space,
+// and in Linux kernel >= 5.11 (including 5.15), passing an active workdir in lowerdir fails with
+// "overlayfs: lowerdir is in-use as upperdir/workdir" (exit status 32).
+func SanitizeFallbackMountOptions(options []string, mountedHostPath string) string {
+	var containerdTmpDirs = []string{"/tmp", "/var/lib"}
+	var upperDir, lowerDir string
+
+	for _, option := range options {
+		remappedOption := option
+		for _, tmpDir := range containerdTmpDirs {
+			if strings.Contains(remappedOption, tmpDir) {
+				remappedOption = strings.Replace(remappedOption, tmpDir, mountedHostPath+tmpDir, -1)
+			}
+		}
+
+		if strings.HasPrefix(remappedOption, "upperdir=") {
+			upperDir = strings.TrimPrefix(remappedOption, "upperdir=")
+		} else if strings.HasPrefix(remappedOption, "lowerdir=") {
+			lowerDir = strings.TrimPrefix(remappedOption, "lowerdir=")
+		}
+	}
+
+	if upperDir != "" && lowerDir != "" {
+		return upperDir + ":" + lowerDir
+	} else if upperDir != "" {
+		return upperDir
+	}
+	return lowerDir
 }
