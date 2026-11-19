@@ -80,7 +80,7 @@ func (c CRIO) ExtractFileSystemContainer(containerId string, namespace string, o
 	cleanrootpath := strings.Trim(strings.TrimSpace(string(rootpath)), "\"")
 	log.Info().Msgf("containerId: %s rootPath: %s", containerId, cleanrootpath)
 
-	if len(rootpath) < 1 {
+	if len(cleanrootpath) < 1 {
 		log.Error().Msgf("container root path is empty for containerID %s", containerId)
 		return errors.New("container root path is empty")
 	}
